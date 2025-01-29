@@ -1,0 +1,200 @@
+units:
+  kx: cx
+  ky: cy
+  px: kx + 4
+  py: ky + 4
+  $default_width: cx-0.5
+  $default_height: cy-0.5
+points:
+  key:
+    footprints:
+      choc_hotswap:
+        type: choc
+        nets:
+          from: =column_net
+          to: GND
+        params:
+            keycaps: true
+            reverse: true
+            hotswap: true
+      choc:
+        type: choc
+        anchor:
+          rotate: 180
+        nets:
+          from: =column_net
+          to: GND
+        params:
+            keycaps: true
+            reverse: true
+  zones:
+    matrix:
+      # Fix placement on KiCAD sheet.
+      anchor:
+        shift: [100, -100]
+      key.padding: ky
+      columns:
+        pinky:
+          key:
+            spread: 18
+            splay: 17
+            origin: [0, -ky]
+            bind: [0.1, 0.5 kx, 0.1, 0.1]
+          rows:
+            bottom:
+              column_net: P6
+            home:
+              column_net: P5
+            top:
+              column_net: P4
+        ring:
+          key:
+            spread: 18
+            stagger: ky
+            splay: -7
+            origin: [0, -ky]
+            bind: [0.1, 0.5 kx, 0.1, 0.1]
+          rows:
+            bottom:
+              column_net: P3
+            home:
+              column_net: P2
+            top:
+              column_net: P0
+        middle:
+          key:
+            spread: 18
+            stagger: ky/3
+            splay: -5
+            origin: [0, -ky]
+            bind: [0.1, 0.1, 0.5 kx, 0.1]
+            shift: [0.2, 0]
+          rows:
+            bottom:
+              column_net: P1
+            home:
+              column_net: P18
+            top:
+              column_net: P15
+        index:
+          key:
+            spread: 18
+            stagger: -ky/3
+            splay: -5
+            origin: [0, -ky]
+            bind: [0.1, 0.1, 0.5 kx, 0.5 kx]
+          rows:
+            bottom:
+              column_net: P14
+            home:
+              column_net: P16
+            top:
+              column_net: P10
+        inner:
+          key:
+            spread: 19
+            stagger: -ky/6
+            origin: [0, -ky]
+            bind: [0.1, 0.1, 0.1, 0.5 kx]
+          rows:
+            bottom:
+              column_net: P19
+            home:
+              column_net: P20
+            top:
+              column_net: P21
+    thumbfan:
+      anchor:
+        ref: matrix_inner_bottom
+        shift: [-1.1 kx, -1.35 ky]
+      columns:
+        home:
+          key:
+            spread: kx
+            splay: -15
+            origin: [0 kx, -4.5 ky]
+            column_net: P7
+        near:
+          key:
+            spread: kx
+            splay: -15
+            origin: [-0.5 kx, -1 ky]
+            column_net: P8
+        far:
+          key:
+            spread: kx
+            splay: -15
+            origin: [-0.5 kx, -1 ky]
+            column_net: P9
+      rows:
+        thumb:
+          row_net: P7
+
+outlines:
+  raw:
+    - what: rectangle
+      where: true
+      bound: true
+      asym: left
+      size: [kx,ky]
+      corner: 1
+  # Key outlines with 0.5mm removed to show key overlaps.
+  keys:
+    - what: rectangle
+      where: true
+      size: [kx-0.5,ky-0.5]
+  board:
+    - what: polygon
+      operation: stack
+      fillet: 2
+      points:
+        - ref: matrix_inner_top
+          shift: [-0.5 kx + 1, 0.5 py]
+        - ref: matrix_inner_top
+          shift: [0.5 px, 0.5 py]
+        - ref: matrix_inner_top
+          shift: [0.6 px, 0.3 py]
+        - ref: matrix_inner_top
+          shift: [1.6 px, 0.3 py]
+        - ref: thumbfan_far_thumb
+          shift: [-0.94 px,  0.8 py]
+        - ref: thumbfan_far_thumb
+          shift: [0.5 px, 0.5 py]
+        - ref: thumbfan_far_thumb
+          shift: [0.5 px, 0.5 py]
+        - ref: thumbfan_far_thumb
+          shift: [0.5 px, -0.5 py]
+        - ref: thumbfan_home_thumb
+          shift: [-0.65 px, -0.4 py]
+        - ref: matrix_pinky_bottom
+          shift: [0.5 px, -0.5 py]
+        - ref: matrix_pinky_bottom
+          shift: [-0.5 px, -0.5 py]
+        - ref: matrix_pinky_top
+          shift: [-0.5 px, 0.5 py]
+        - ref: matrix_pinky_top
+          shift: [0.54 px, 0.5 py]
+        - ref: matrix_ring_top
+          shift: [-0.54 px, 0.5 py]
+        - ref: matrix_ring_top
+          shift: [ 0.54 px, 0.5 py]
+        - ref: matrix_middle_top
+          shift: [-0.54 px, 0.5 py]
+        - ref: matrix_middle_top
+          shift: [ 0.54 px, 0.5 py]
+        - ref: matrix_index_top
+          shift: [-0.5 px, 0.5 py]
+        - ref: matrix_index_top
+          shift: [0.5 kx, 0.5 py]
+  controller:
+    - what: rectangle
+      where:
+        ref: matrix_inner_top
+        shift: [1.14 px, -0.55 py]
+      size: [19, 34]
+  layout_tester:
+    - name: board
+    - operation: subtract
+      name: keys
+    - operation: subtract
+      name: controller
