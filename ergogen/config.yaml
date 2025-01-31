@@ -1,3 +1,5 @@
+meta:
+  engine: 4.1.0 # Min Ergogen version for KiCad 8 footprints
 units:
   kx: cx
   ky: cy
@@ -106,7 +108,7 @@ points:
     thumbfan:
       anchor:
         ref: matrix_inner_bottom
-        shift: [-1.1 kx, -1.35 ky]
+        shift: [-1.1 kx, -1.5 ky]
       columns:
         home:
           key:
@@ -153,9 +155,7 @@ outlines:
         - ref: matrix_inner_top
           shift: [0.5 px, 0.5 py]
         - ref: matrix_inner_top
-          shift: [0.6 px, 0.3 py]
-        - ref: matrix_inner_top
-          shift: [1.6 px, 0.3 py]
+          shift: [1.6 px, 0.5 py]
         - ref: thumbfan_far_thumb
           shift: [-0.94 px,  0.8 py]
         - ref: thumbfan_far_thumb
@@ -165,7 +165,7 @@ outlines:
         - ref: thumbfan_far_thumb
           shift: [0.5 px, -0.5 py]
         - ref: thumbfan_home_thumb
-          shift: [-0.65 px, -0.4 py]
+          shift: [-0.9 px, -0.3 py]
         - ref: matrix_pinky_bottom
           shift: [0.5 px, -0.5 py]
         - ref: matrix_pinky_bottom
@@ -190,11 +190,43 @@ outlines:
     - what: rectangle
       where:
         ref: matrix_inner_top
-        shift: [1.14 px, -0.55 py]
+        shift: [1.14 px, -0.35 py]
       size: [19, 34]
+  jst_bat:
+    - what: rectangle
+      where:
+        ref: matrix_inner_bottom
+        shift: [0.7 px, 0.2 py]
+      size: [7.6, 5.9]
+  power_button:
+    - what: rectangle
+      where:
+        ref: matrix_inner_bottom
+        shift: [1.44 px, -0.1 py]
+      size: [5.8, 5.8]
+  reset_button:
+    - what: rectangle
+      where:
+        ref: matrix_inner_bottom
+        shift: [1.41 px, 0.25 py]
+      size: [7, 4.5]
+  rotary_encoder:
+    - what: circle
+      where:
+        ref: matrix_inner_bottom
+        shift: [0.9 px, -0.65 py]
+      radius: 10
   layout_tester:
     - name: board
-    - operation: subtract
-      name: keys
-    - operation: subtract
-      name: controller
+    - name: keys
+      operation: subtract
+    - name: controller
+      operation: subtract
+    - name: jst_bat
+      operation: subtract
+    - name: power_button
+      operation: subtract
+    - name: reset_button
+      operation: subtract
+    - name: rotary_encoder
+      operation: subtract
