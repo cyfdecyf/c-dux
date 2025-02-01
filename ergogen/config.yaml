@@ -12,7 +12,7 @@ points:
     matrix:
       # Fix placement on KiCAD sheet.
       anchor:
-        shift: [100, -100]
+        shift: [150, -150]
       key:
         # Horizontal spacing.
         spread: kx
@@ -169,31 +169,31 @@ outlines:
     - what: rectangle
       where:
         ref: matrix_inner_top
-        shift: [1.14 px, -0.35 py]
+        shift: [25, -7.3]
       size: [19, 34]
   jst_bat:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [0.7 px, 0.2 py]
+        shift: [14, 4.2]
       size: [7.6, 5.9]
   power_button:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [1.44 px, -0.1 py]
+        shift: [32, -2.1]
       size: [5.8, 5.8]
   reset_button:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [1.41 px, 0.25 py]
+        shift: [31, 5]
       size: [7, 4.5]
   rotary_encoder:
     - what: circle
       where:
         ref: matrix_inner_bottom
-        shift: [0.9 px, -0.65 py]
+        shift: [20, -14]
       radius: 10
   layout_tester:
     - name: board
@@ -209,3 +209,66 @@ outlines:
       operation: subtract
     - name: rotary_encoder
       operation: subtract
+pcbs:
+  c-dux:
+    template: kicad8
+    outlines:
+      main:
+        outline: board
+    footprints:
+      choc_hotswap:
+        what: ceoloide/switch_choc_v1_v2
+        where: true
+        params:
+          side: F
+          choc_v1_support: true
+          choc_v2_support: false
+          reversible: true
+          hotswap: true
+          include_keycap: true
+          locked_traces_vias: true
+          hotswap_pads_same_side: true
+          include_corner_marks: true
+          # Kailh spec uses 1.9mm diameter for outer stabilizers, but maybe its too large.
+          # Most opensource footprint uses 1.7mm diameter which I don't know if it's too small.
+          # So use 1.8mm diameter for now.
+          choc_v1_stabilizers_diameter: 1.8
+          hotswap_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Choc_V1_Hotswap.step
+          # If side is B, need following offset.
+          # hotswap_3dmodel_xyz_offset: [-5, -9.7, 0]
+          # include_plated_holes: true # Do not know how to use this.
+          from: "{{column_net}}"
+          to: GND
+      mcu_l:
+        what: ceoloide/mcu_supermini_nrf52840
+        params:
+          reversible: false
+          show_silk_labels_on_both_sides: true
+          # This makes left hand side RAW on top left.
+          reverse_mount: true
+          # reversible: true
+          # only_required_jumpers: true
+          include_extra_pins: true
+          mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
+        where:
+          ref: matrix_inner_top
+          shift: [25, -7.3]
+          rotate: 0
+      jst_bat:
+        what: ceoloide/battery_connector_jst_ph_2
+        params:
+          reversible: false
+          BAT_P: RAW
+          BAT_N: GND
+        where:
+          ref: matrix_inner_bottom
+          shift: [14, 4.2]
+          rotate: 90
+      rotary_encoder:
+        what: ceoloide/rotary_encoder_ec11_ec12
+        params:
+          reversible: true
+        where:
+          ref: matrix_inner_bottom
+          shift: [20, -14]
+          rotate: 90
