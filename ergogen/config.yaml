@@ -13,11 +13,14 @@ points:
       # Fix placement on KiCAD sheet.
       anchor:
         shift: [100, -100]
-      key.padding: ky
+      key:
+        # Horizontal spacing.
+        spread: kx
+        # Vertical spacing.
+        padding: ky
       columns:
         pinky:
           key:
-            spread: 18
             splay: 17
             origin: [0, -ky]
             bind: [0.1, 0.5 kx, 0.1, 0.1]
@@ -30,7 +33,6 @@ points:
               column_net: P4
         ring:
           key:
-            spread: 18
             stagger: ky
             splay: -7
             origin: [0, -ky]
@@ -44,7 +46,6 @@ points:
               column_net: P0
         middle:
           key:
-            spread: 18
             stagger: ky/3
             splay: -5
             origin: [0, -ky]
@@ -59,7 +60,6 @@ points:
               column_net: P15
         index:
           key:
-            spread: 18
             stagger: -ky/3
             splay: -5
             origin: [0, -ky]
@@ -73,7 +73,7 @@ points:
               column_net: P10
         inner:
           key:
-            spread: 19
+            spread: kx + 1
             stagger: -ky/6
             origin: [0, -ky]
             bind: [0.1, 0.1, 0.1, 0.5 kx]
