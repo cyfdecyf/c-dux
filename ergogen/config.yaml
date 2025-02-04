@@ -283,3 +283,13 @@ pcbs:
         where:
           ref: matrix_inner_bottom
           shift: [32, -2.1]
+      reset_button:
+        what: reset_switch_smd_top
+        params:
+          side: 'F'
+          reversible: true
+          PAD_1: RST
+          PAD_3: GND
+        where:
+          ref: matrix_inner_bottom
+          shift: [31, 5]
