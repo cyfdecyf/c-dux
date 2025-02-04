@@ -258,7 +258,7 @@ pcbs:
         what: ceoloide/battery_connector_jst_ph_2
         params:
           reversible: false
-          BAT_P: RAW
+          BAT_P: BRAW
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
@@ -272,3 +272,14 @@ pcbs:
           ref: matrix_inner_bottom
           shift: [20, -14]
           rotate: 90
+      power_button:
+        what: power_switch_tht_top_self_lock
+        params:
+          side: 'F'
+          # switch_3dmodel_filename: ''
+          show_silk_labels_on_both_sides: true
+          PAD_1: RAW
+          PAD_2: BRAW
+        where:
+          ref: matrix_inner_bottom
+          shift: [32, -2.1]
