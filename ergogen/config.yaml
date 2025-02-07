@@ -144,7 +144,7 @@ outlines:
         - ref: thumbfan_far_thumb
           shift: [0.5 px, -0.5 py]
         - ref: thumbfan_home_thumb
-          shift: [-1.1 px, -0.7 py]
+          shift: [0.5 px, -0.7 py]
         - ref: matrix_pinky_bottom
           shift: [0.5 px, -0.5 py]
         - ref: matrix_pinky_bottom
@@ -152,17 +152,17 @@ outlines:
         - ref: matrix_pinky_top
           shift: [-0.5 px, 0.5 py]
         - ref: matrix_pinky_top
-          shift: [0.54 px, 0.5 py]
+          shift: [0.56 px, 0.5 py]
         - ref: matrix_ring_top
-          shift: [-0.54 px, 0.5 py]
-        - ref: matrix_ring_top
-          shift: [ 0.54 px, 0.5 py]
-        - ref: matrix_middle_top
-          shift: [-0.54 px, 0.5 py]
-        - ref: matrix_middle_top
-          shift: [ 0.54 px, 0.5 py]
-        - ref: matrix_index_top
           shift: [-0.5 px, 0.5 py]
+        - ref: matrix_ring_top
+          shift: [ 0.57 px, 0.5 py]
+        - ref: matrix_middle_top
+          shift: [-0.5 px, 0.5 py]
+        - ref: matrix_middle_top
+          shift: [ 0.5 px, 0.5 py]
+        - ref: matrix_index_top
+          shift: [-0.54 px, 0.5 py]
         - ref: matrix_index_top
           shift: [0.5 kx, 0.5 py]
   controller:
