@@ -241,6 +241,7 @@ pcbs:
           # Most opensource footprint uses 1.7mm diameter which I don't know if it's too small.
           # So use 1.8mm diameter for now.
           choc_v1_stabilizers_diameter: 1.8
+          # 3D model from https://github.com/infused-kim/kb_ergogen_fp/tree/main/3d_models
           hotswap_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Choc_V1_Hotswap.step
           # If side is B, need following offset.
           # hotswap_3dmodel_xyz_offset: [-5, -9.7, 0]
@@ -257,6 +258,7 @@ pcbs:
           # reversible: true
           # only_required_jumpers: true
           include_extra_pins: true
+          # 3D model from https://github.com/infused-kim/kb_ergogen_fp/tree/main/3d_models
           mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
         where:
           ref: matrix_inner_top
@@ -276,6 +278,8 @@ pcbs:
         what: ceoloide/rotary_encoder_ec11_ec12
         params:
           reversible: true
+          # 3D model from https://github.com/foostan/kbd/blob/main/kicad-packages3D/kbd.3dshapes
+          encoder_3dmodel_filename: ${KICAD8_3RD_PARTY}/3dmodels\kbd.3dshapes/RotarryEncoder_EC12-SW.step
         where:
           ref: matrix_inner_bottom
           shift: [20, -14]
