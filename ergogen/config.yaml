@@ -144,7 +144,7 @@ outlines:
         - ref: thumbfan_far_thumb
           shift: [0.5 px, -0.5 py]
         - ref: thumbfan_home_thumb
-          shift: [-0.9 px, -0.3 py]
+          shift: [-1.1 px, -0.7 py]
         - ref: matrix_pinky_bottom
           shift: [0.5 px, -0.5 py]
         - ref: matrix_pinky_bottom
@@ -195,6 +195,12 @@ outlines:
         ref: matrix_inner_bottom
         shift: [20, -14]
       radius: 10
+  tenting_puck:
+    - what: circle
+      where:
+        ref: matrix_index_bottom
+        shift: [-5.85, -21.5]
+      radius: 20.5
   layout_tester:
     - name: board
     - name: keys
@@ -208,6 +214,8 @@ outlines:
     - name: reset_button
       operation: subtract
     - name: rotary_encoder
+      operation: subtract
+    - name: tenting_puck
       operation: subtract
 pcbs:
   c-dux:
@@ -293,3 +301,11 @@ pcbs:
         where:
           ref: matrix_inner_bottom
           shift: [31, 7.85]
+      tening_puck:
+        what: tenting_puck
+        params:
+          side: 'F'
+        where:
+          ref: matrix_index_bottom
+          shift: [-5.85, -21.5]
+          rotate: 39
