@@ -313,3 +313,18 @@ pcbs:
           ref: matrix_index_bottom
           shift: [-5.85, -21.5]
           rotate: 39
+      c_dux_text:
+        what: ceoloide/utility_text
+        params:
+          text: 'c-dux by cyf\ndesigned with\nErgogen'
+          reversible: true
+        where:
+          ref: matrix_pinky_bottom
+          shift: [1 kx, 0 ky]
+      ergogen_logo:
+        what: ceoloide/utility_ergogen_logo
+        params:
+          reversible: true
+        where:
+          ref: matrix_pinky_bottom
+          shift: [1 kx, -0.4 ky]
