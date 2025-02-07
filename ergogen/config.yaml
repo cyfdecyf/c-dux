@@ -130,13 +130,13 @@ outlines:
       fillet: 2
       points:
         - ref: matrix_inner_top
-          shift: [-0.5 kx + 1, 0.5 py]
+          shift: [-0.5 kx + 1, 0.5 py + ky / 6]
         - ref: matrix_inner_top
-          shift: [0.5 px, 0.5 py]
+          shift: [0.5 px, 0.5 py + ky / 6]
         - ref: matrix_inner_top
-          shift: [1.6 px, 0.5 py]
-        - ref: thumbfan_far_thumb
-          shift: [-0.94 px,  0.8 py]
+          shift: [1.6 px, 0.5 py + ky / 6]
+        - ref: matrix_inner_top
+          shift: [1.6 px, -3.5 ky]
         - ref: thumbfan_far_thumb
           shift: [0.5 px, 0.5 py]
         - ref: thumbfan_far_thumb
@@ -169,25 +169,25 @@ outlines:
     - what: rectangle
       where:
         ref: matrix_inner_top
-        shift: [25, -7.3]
+        shift: [25, -4.5]
       size: [19, 34]
   jst_bat:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [14, 4.2]
+        shift: [14, 7.3]
       size: [7.6, 5.9]
   power_button:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [32, -2.1]
+        shift: [31, 0.85]
       size: [5.8, 5.8]
   reset_button:
     - what: rectangle
       where:
         ref: matrix_inner_bottom
-        shift: [31, 5]
+        shift: [31, 7.85]
       size: [7, 4.5]
   rotary_encoder:
     - what: circle
@@ -252,7 +252,7 @@ pcbs:
           mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
         where:
           ref: matrix_inner_top
-          shift: [25, -7.3]
+          shift: [25, -4.5]
           rotate: 0
       jst_bat:
         what: ceoloide/battery_connector_jst_ph_2
@@ -262,7 +262,7 @@ pcbs:
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
-          shift: [14, 4.2]
+          shift: [13, 7.3]
           rotate: 90
       rotary_encoder:
         what: ceoloide/rotary_encoder_ec11_ec12
@@ -282,7 +282,7 @@ pcbs:
           PAD_2: BRAW
         where:
           ref: matrix_inner_bottom
-          shift: [32, -2.1]
+          shift: [31, 0]
       reset_button:
         what: reset_switch_smd_top
         params:
@@ -292,4 +292,4 @@ pcbs:
           PAD_3: GND
         where:
           ref: matrix_inner_bottom
-          shift: [31, 5]
+          shift: [31, 7.85]
