@@ -237,10 +237,10 @@ pcbs:
           locked_traces_vias: true
           hotswap_pads_same_side: true
           include_corner_marks: true
-          # Kailh spec uses 1.9mm diameter for outer stabilizers, but maybe its too large.
-          # Most opensource footprint uses 1.7mm diameter which I don't know if it's too small.
-          # So use 1.8mm diameter for now.
-          choc_v1_stabilizers_diameter: 1.8
+          # Kailh spec found on LCSC uses 1.9mm diameter for outer stabilizers, but its too large.
+          # Most opensource footprint uses 1.7mm diameter.
+          # I measured my choc v1 switches and its 1.6mm thus I'm using 1.7mm here.
+          choc_v1_stabilizers_diameter: 1.7
           # 3D model from https://github.com/infused-kim/kb_ergogen_fp/tree/main/3d_models
           hotswap_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Choc_V1_Hotswap.step
           # If side is B, need following offset.
