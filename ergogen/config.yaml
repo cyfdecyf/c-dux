@@ -274,16 +274,6 @@ pcbs:
           ref: matrix_inner_bottom
           shift: [13, 7.3]
           rotate: 90
-      rotary_encoder:
-        what: ceoloide/rotary_encoder_ec11_ec12
-        params:
-          reversible: true
-          # 3D model from https://github.com/foostan/kbd/blob/main/kicad-packages3D/kbd.3dshapes
-          encoder_3dmodel_filename: ${KICAD8_3RD_PARTY}/3dmodels\kbd.3dshapes/RotarryEncoder_EC12-SW.step
-        where:
-          ref: matrix_inner_bottom
-          shift: [20, -14]
-          rotate: 90
       power_button:
         what: power_switch_tht_top_self_lock
         params:
@@ -305,6 +295,16 @@ pcbs:
         where:
           ref: matrix_inner_bottom
           shift: [31, 7.85]
+      rotary_encoder:
+        what: ceoloide/rotary_encoder_ec11_ec12
+        params:
+          reversible: true
+          # 3D model from https://github.com/foostan/kbd/blob/main/kicad-packages3D/kbd.3dshapes
+          encoder_3dmodel_filename: ${KICAD8_3RD_PARTY}/3dmodels\kbd.3dshapes/RotarryEncoder_EC12-SW.step
+        where:
+          ref: matrix_inner_bottom
+          shift: [20, -14]
+          rotate: 90
       tening_puck:
         what: tenting_puck
         params:
