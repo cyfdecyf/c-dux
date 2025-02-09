@@ -254,7 +254,7 @@ pcbs:
           reversible: false
           show_silk_labels_on_both_sides: true
           # This makes left hand side RAW on top left.
-          reverse_mount: true
+          # reverse_mount: true
           # reversible: true
           # only_required_jumpers: true
           include_extra_pins: true
@@ -277,7 +277,7 @@ pcbs:
       power_button:
         what: power_switch_tht_top_self_lock
         params:
-          side: 'F'
+          side: F
           # switch_3dmodel_filename: ''
           show_silk_labels_on_both_sides: true
           PAD_1: RAW
@@ -288,7 +288,7 @@ pcbs:
       reset_button:
         what: reset_switch_smd_top
         params:
-          side: 'F'
+          side: F
           reversible: true
           PAD_1: RST
           PAD_3: GND
