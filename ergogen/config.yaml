@@ -311,7 +311,7 @@ pcbs:
           side: 'F'
         where:
           ref: matrix_index_bottom
-          shift: [-5.85, -21.5]
+          shift: [-5.87, -22.1]
           rotate: 39
       c_dux_text:
         what: ceoloide/utility_text
