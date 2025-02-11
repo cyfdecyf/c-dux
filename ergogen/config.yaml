@@ -272,7 +272,7 @@ pcbs:
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
-          shift: [13, 7.3]
+          shift: [13.5, 6.5]
           rotate: 90
       power_button:
         what: power_switch_tht_top_self_lock
@@ -284,17 +284,19 @@ pcbs:
           PAD_2: BRAW
         where:
           ref: matrix_inner_bottom
-          shift: [31, 0]
+          shift: [31.1, -1.3]
+          rotate: 90
       reset_button:
         what: reset_switch_smd_top
         params:
           side: F
           reversible: true
-          PAD_1: RST
-          PAD_3: GND
+          PAD_1: GND
+          PAD_3: RST
         where:
           ref: matrix_inner_bottom
-          shift: [31, 7.85]
+          shift: [31.64, -25.12]
+          rotate: 270
       rotary_encoder:
         what: ceoloide/rotary_encoder_ec11_ec12
         params:
@@ -325,11 +327,11 @@ pcbs:
           reversible: true
         where:
           ref: matrix_pinky_bottom
-          shift: [1 kx, 0 ky]
+          shift: [0.95 kx, 0 ky]
       ergogen_logo:
         what: ceoloide/utility_ergogen_logo
         params:
           reversible: true
         where:
           ref: matrix_pinky_bottom
-          shift: [1 kx, -0.4 ky]
+          shift: [0.95 kx, -0.38 ky]
