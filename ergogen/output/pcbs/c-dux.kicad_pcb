@@ -11,7 +11,7 @@
   (paper "A3")
   (title_block
     (title "c-dux")
-    (date "2025-02-11")
+    (date "2025-03-05")
     (rev "v1.0.0")
     (company "Unknown")
   )
@@ -3604,6 +3604,18 @@
         (fp_line (start 2.14 6.36) (end 3.06 6.36) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
         (fp_line (start 3.06 6.36) (end 3.06 5.36) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
         
+        (fp_line (start -1.5 7.40) (end -0.5 7.40) (stroke (width 0.1) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 1.5 7.40) (end 0.5 7.40) (stroke (width 0.1) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 1 6.90) (end 1 7.90) (stroke (width 0.1) (type solid)) (layer "B.SilkS"))
+        (fp_line (start -2.06 -1.46) (end -3.06 -1.46) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start -3.06 -1.46) (end -3.06 -0.46) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 2.14 -1.46) (end 3.06 -1.46) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 3.06 -1.46) (end 3.06 -0.46) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start -2.14 6.36) (end -3.06 6.36) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start -3.06 6.36) (end -3.06 5.36) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 2.14 6.36) (end 3.06 6.36) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        (fp_line (start 3.06 6.36) (end 3.06 5.36) (stroke (width 0.12) (type solid)) (layer "B.SilkS"))
+        
         (pad "1" thru_hole roundrect (at -1 0 90) (size 1.2 1.75) (drill 0.75) (layers "*.Cu" "*.Mask") (roundrect_rratio 0.20) (net 2 "GND"))
         (pad "2" thru_hole oval (at 1 0 90) (size 1.2 1.75) (drill 0.75) (layers "*.Cu" "*.Mask") (net 52 "BRAW"))
         
@@ -3776,12 +3788,12 @@
       (effects (font (size 1 1) (thickness 0.15)))
     )
     (attr through_hole)
-    (pad "A" thru_hole oval (at 2.5 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "F.Mask") (net 27 "P10"))
-    (pad "B" thru_hole oval (at 0 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "F.Mask") (net 2 "GND"))
-    (pad "C" thru_hole oval (at -2.5 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "F.Mask") (net 26 "P16"))
+    (pad "A" thru_hole oval (at 2.5 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "*.Mask") (net 27 "P10"))
+    (pad "B" thru_hole oval (at 0 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "*.Mask") (net 2 "GND"))
+    (pad "C" thru_hole oval (at -2.5 7.5 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "*.Mask") (net 26 "P16"))
     
-    (pad "S1" thru_hole oval (at -2.5 -7 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "F.Mask") (net 2 "GND"))
-    (pad "S2" thru_hole oval (at 2.5 -7 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "F.Mask") (net 25 "P18"))
+    (pad "S1" thru_hole oval (at -2.5 -7 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "*.Mask") (net 2 "GND"))
+    (pad "S2" thru_hole oval (at 2.5 -7 90) (size 1.6 1.1) (drill oval 1 0.5) (layers "*.Cu" "*.Mask") (net 25 "P18"))
     
     (pad "" thru_hole roundrect
       (at -5.6 0 0)
