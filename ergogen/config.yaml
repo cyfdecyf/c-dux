@@ -268,6 +268,7 @@ pcbs:
         what: ceoloide/battery_connector_jst_ph_2
         params:
           reversible: false
+          include_silkscreen_on_both_sides: true
           BAT_P: BRAW
           BAT_N: GND
         where:
