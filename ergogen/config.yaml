@@ -73,7 +73,6 @@ points:
               column_net: P20
         inner:
           key:
-            spread: kx + 1
             stagger: -ky/6
             origin: [0, -ky]
             bind: [0.1, 0.1, 0.1, 0.5 kx]
