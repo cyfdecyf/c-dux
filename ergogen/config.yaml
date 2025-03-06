@@ -232,6 +232,7 @@ pcbs:
           choc_v1_support: true
           choc_v2_support: false
           reversible: true
+          solder: true
           hotswap: true
           include_keycap: true
           locked_traces_vias: true
