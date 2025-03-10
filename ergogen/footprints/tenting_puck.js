@@ -2,15 +2,15 @@
 // 
 // Adapted to ErgoGen from [KiCAD footprint](https://github.com/splitkb/tenting_puck/blob/main/TentingPuck_NoHole.kicad_mod)
 module.exports = {
-	params: {
-		designator: 'TP',
-		side: 'F',
+  params: {
+    designator: 'TP',
+    side: 'F',
   },
-	body: p => {
+  body: p => {
     return `
 (footprint "TentingPuck_NoHole" (version 20211014) (generator pcbnew)
   (layer "${p.side}.Cu")
-	${p.at /* parametric position */}
+  ${p.at /* parametric position */}
   (tedit 6220ACBE)
   (attr exclude_from_pos_files exclude_from_bom)
   (fp_text reference "${p.ref}" (at 0 0) (layer "F.Fab") ${p.ref_hide}
