@@ -234,6 +234,7 @@ pcbs:
           solder: true
           hotswap: true
           include_keycap: true
+          include_traces_vias_no_gnd: true
           locked_traces_vias: true
           hotswap_pads_same_side: true
           include_corner_marks: true
