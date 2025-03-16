@@ -268,7 +268,9 @@ pcbs:
       jst_bat:
         what: ceoloide/battery_connector_jst_ph_2
         params:
-          reversible: false
+          reversible: true
+          use_3_thru_holes: true
+          housing_positive_on_left: true
           include_silkscreen_on_both_sides: true
           BAT_P: BRAW
           BAT_N: GND
