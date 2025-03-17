@@ -170,51 +170,11 @@ outlines:
         ref: matrix_inner_top
         shift: [25, -4.5]
       size: [19, 34]
-  jst_bat:
-    - what: rectangle
-      where:
-        ref: matrix_inner_bottom
-        shift: [14, 7.3]
-      size: [7.6, 5.9]
-  power_button:
-    - what: rectangle
-      where:
-        ref: matrix_inner_bottom
-        shift: [31, 0.85]
-      size: [5.8, 5.8]
-  reset_button:
-    - what: rectangle
-      where:
-        ref: matrix_inner_bottom
-        shift: [31, 7.85]
-      size: [7, 4.5]
-  rotary_encoder:
-    - what: circle
-      where:
-        ref: matrix_inner_bottom
-        shift: [20, -14]
-      radius: 10
-  tenting_puck:
-    - what: circle
-      where:
-        ref: matrix_index_bottom
-        shift: [-5.85, -21.5]
-      radius: 20.5
   layout_tester:
     - name: board
     - name: keys
       operation: subtract
     - name: controller
-      operation: subtract
-    - name: jst_bat
-      operation: subtract
-    - name: power_button
-      operation: subtract
-    - name: reset_button
-      operation: subtract
-    - name: rotary_encoder
-      operation: subtract
-    - name: tenting_puck
       operation: subtract
 pcbs:
   c-dux:
