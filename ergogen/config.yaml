@@ -293,8 +293,6 @@ pcbs:
           A: P10
           B: GND
           C: P16
-          S1: GND
-          S2: P18
         where:
           ref: matrix_index_bottom
           shift: [0, -28]
