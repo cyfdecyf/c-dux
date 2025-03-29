@@ -296,8 +296,8 @@ pcbs:
           S1: GND
           S2: P18
         where:
-          ref: matrix_inner_bottom
-          shift: [20, -14]
+          ref: matrix_index_bottom
+          shift: [0, -28]
           rotate: 90
       tening_puck:
         what: tenting_puck
