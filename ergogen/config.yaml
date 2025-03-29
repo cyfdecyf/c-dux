@@ -139,19 +139,17 @@ outlines:
       fillet: 2
       points:
         - ref: matrix_inner_top
-          shift: [-0.5 kx + 1, 0.46 py + ky / 6]
+          shift: [-0.37 kx, 0.46 py]
         - ref: matrix_inner_top
-          shift: [0.5 px, 0.46 py + ky / 6]
+          shift: [33, 0.46 py]
         - ref: matrix_inner_top
-          shift: [1.6 px, 0.46 py + ky / 6]
-        - ref: matrix_inner_top
-          shift: [1.6 px, -3.5 ky]
+          shift: [33, -3.5 ky]
         - ref: thumbfan_far_thumb
           shift: [0.47 px, 0.5 py]
         - ref: thumbfan_far_thumb
           shift: [0.47 px, -0.5 py]
         - ref: thumbfan_home_thumb
-          shift: [0.5 px, -0.7 py]
+          shift: [-0.6 px, -0.5 py]
         - ref: matrix_pinky_bottom
           shift: [0.5 px, -0.47 py]
         - ref: matrix_pinky_bottom
@@ -179,12 +177,12 @@ outlines:
         - ref: matrix_index_top
           shift: [-0.54 px, 0.46 py]
         - ref: matrix_index_top
-          shift: [0.5 kx, 0.46 py]
+          shift: [0.54 kx, 0.46 py]
   controller:
     - what: rectangle
       where:
         ref: matrix_inner_top
-        shift: [25, -4.5]
+        shift: [23, -8]
       size: [19, 34]
   layout_tester:
     - name: board
@@ -246,7 +244,7 @@ pcbs:
           mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
         where:
           ref: matrix_inner_top
-          shift: [23, -7.5]
+          shift: [23.5, -15.5]
           rotate: 0
       jst_bat:
         what: ceoloide/battery_connector_jst_ph_2
@@ -259,7 +257,7 @@ pcbs:
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
-          shift: [13.5, 6.5]
+          shift: [15.5, -10.25]
           rotate: 90
       power_button:
         what: power_switch_tht_top_self_lock
@@ -271,7 +269,7 @@ pcbs:
           PAD_2: BRAW
         where:
           ref: matrix_inner_bottom
-          shift: [31.1, -1.3]
+          shift: [17, -3]
           rotate: 90
       reset_button:
         what: reset_switch_smd_top
@@ -282,7 +280,7 @@ pcbs:
           PAD_3: RST
         where:
           ref: matrix_inner_bottom
-          shift: [31.64, -25.12]
+          shift: [29.34, 0]
           rotate: 270
       rotary_encoder:
         what: ceoloide/rotary_encoder_ec11_ec12
