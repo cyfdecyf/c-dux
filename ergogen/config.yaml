@@ -246,7 +246,7 @@ pcbs:
           mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
         where:
           ref: matrix_inner_top
-          shift: [25, -4.5]
+          shift: [23, -7.5]
           rotate: 0
       jst_bat:
         what: ceoloide/battery_connector_jst_ph_2
