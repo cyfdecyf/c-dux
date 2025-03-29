@@ -45,7 +45,7 @@ points:
           key:
             stagger: ky
             splay: -7
-            origin: [0, -ky]
+            origin: [0, -0.65ky]
             bind: [0.1, 0.5 kx, 0.1, 0.1]
           rows:
             bottom:
@@ -58,7 +58,7 @@ points:
           key:
             stagger: ky/3
             splay: -5
-            origin: [5, -ky]
+            origin: [5, -0.55ky]
             bind: [0.1, 0.1, 0.5 kx, 0.1]
             shift: [0.2, 0]
           rows:
@@ -72,7 +72,7 @@ points:
           key:
             stagger: -ky/3
             splay: -5
-            origin: [0, -ky]
+            origin: [0, -0.55ky]
             bind: [0.1, 0.1, 0.5 kx, 0.5 kx]
           rows:
             bottom:
@@ -167,17 +167,17 @@ outlines:
         - ref: matrix_pinky_top
           shift: [-0.46 px, 0.47 py]
         - ref: matrix_pinky_top
-          shift: [0.57 px, 0.47 py]
+          shift: [0.54 px, 0.47 py]
         - ref: matrix_ring_top
           shift: [-0.49 px, 0.46 py]
         - ref: matrix_ring_top
-          shift: [ 0.58 px, 0.46 py]
+          shift: [ 0.55 px, 0.46 py]
         - ref: matrix_middle_top
           shift: [-0.48 px, 0.46 py]
         - ref: matrix_middle_top
           shift: [ 0.47 px, 0.46 py]
         - ref: matrix_index_top
-          shift: [-0.57 px, 0.46 py]
+          shift: [-0.54 px, 0.46 py]
         - ref: matrix_index_top
           shift: [0.5 kx, 0.46 py]
   controller:
@@ -192,6 +192,7 @@ outlines:
       operation: subtract
     - name: controller
       operation: subtract
+
 pcbs:
   c-dux:
     template: kicad8
