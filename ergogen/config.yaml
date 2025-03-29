@@ -196,7 +196,12 @@ pcbs:
           include_keycap: true
           include_traces_vias_no_gnd: true
           locked_traces_vias: true
-          hotswap_pads_same_side: true
+          # In order to use trace connecting hotswap positive via to solder
+          # positive through hole, we need to set this to false.
+          # We will have the socket's positive pads on front and back layers
+          # close to each other and connected with a via in center.
+          # A trace will connect this via to the direct soldering center positive pad.
+          hotswap_pads_same_side: false
           include_corner_marks: true
           # Kailh spec found on LCSC uses 1.9mm diameter for outer stabilizers, but its too large.
           # Most opensource footprint uses 1.7mm diameter.
