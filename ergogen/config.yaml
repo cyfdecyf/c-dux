@@ -139,11 +139,11 @@ outlines:
       fillet: 2
       points:
         - ref: matrix_inner_top
-          shift: [-0.37 kx, 0.46 py]
+          shift: [-0.37 kx, 0.46 py + 1/6 ky]
         - ref: matrix_inner_top
-          shift: [33, 0.46 py]
+          shift: [33.2, 0.46 py + 1/6 ky]
         - ref: matrix_inner_top
-          shift: [33, -3.5 ky]
+          shift: [33.2, -3.5 ky]
         - ref: thumbfan_far_thumb
           shift: [0.47 px, 0.5 py]
         - ref: thumbfan_far_thumb
@@ -165,7 +165,7 @@ outlines:
         - ref: matrix_pinky_top
           shift: [-0.46 px, 0.47 py]
         - ref: matrix_pinky_top
-          shift: [0.54 px, 0.47 py]
+          shift: [0.35 px, 0.7 py]
         - ref: matrix_ring_top
           shift: [-0.49 px, 0.46 py]
         - ref: matrix_ring_top
@@ -276,12 +276,12 @@ pcbs:
         params:
           side: F
           reversible: true
-          PAD_1: GND
-          PAD_3: RST
+          PAD_1: RST
+          PAD_3: GND
         where:
-          ref: matrix_inner_bottom
-          shift: [29.34, 0]
-          rotate: 270
+          ref: matrix_inner_top
+          shift: [17, 9.2]
+          rotate: 180
       rotary_encoder:
         what: ceoloide/rotary_encoder_ec11_ec12
         params:
@@ -310,12 +310,40 @@ pcbs:
           text: 'c-dux by cyf\ndesigned with\nErgogen'
           reversible: true
         where:
-          ref: matrix_pinky_bottom
-          shift: [0.95 kx, 0 ky]
+          ref: matrix_index_bottom
+          shift: [-16.07, -15]
       ergogen_logo:
         what: ceoloide/utility_ergogen_logo
         params:
           reversible: true
         where:
-          ref: matrix_pinky_bottom
-          shift: [0.95 kx, -0.38 ky]
+          ref: matrix_index_bottom
+          shift: [-15.75, -21.15]
+      mounting_hole_inner_top:
+        what: ceoloide/mounting_hole_plated
+        params:
+          drill: 4.2
+        where:
+          ref: matrix_inner_top
+          shift: [29, 8.2]
+      mounting_hole_inner_bottom:
+        what: ceoloide/mounting_hole_plated
+        params:
+          drill: 4.2
+        where:
+          ref: matrix_inner_bottom
+          shift: [29, -24]
+      mounting_hole_pinky_top:
+        what: ceoloide/mounting_hole_plated
+        params:
+          drill: 4.2
+        where:
+          ref: matrix_index_bottom
+          shift: [-53.82, 20.14]
+      mounting_hole_pinky_bottom:
+        what: ceoloide/mounting_hole_plated
+        params:
+          drill: 4.2
+        where:
+          ref: matrix_index_bottom
+          shift: [-35.93, -28.6]
