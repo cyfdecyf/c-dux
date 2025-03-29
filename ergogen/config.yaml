@@ -302,10 +302,11 @@ pcbs:
         what: tenting_puck
         params:
           side: F
+          use_three_holes: true
         where:
-          ref: matrix_index_bottom
-          shift: [-5.87, -22.1]
-          rotate: 39
+          ref: matrix_inner_bottom
+          shift: [-3.279, 3.203]
+          rotate: 310
       c_dux_text:
         what: ceoloide/utility_text
         params:
