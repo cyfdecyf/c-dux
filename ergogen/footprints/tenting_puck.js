@@ -1,10 +1,14 @@
 // Footprint for splitkb's [Tenting Puck](https://splitkb.com/products/tenting-puck)
 // 
 // Adapted to ErgoGen from [KiCAD footprint](https://github.com/splitkb/tenting_puck/blob/main/TentingPuck_NoHole.kicad_mod)
+//
+// Params:
+//    three_hole: use only three holes instead of all four.
 module.exports = {
   params: {
     designator: 'TP',
     side: 'F',
+    use_three_holes: false,
   },
   body: p => {
     return `
@@ -405,7 +409,8 @@ module.exports = {
   (pad "1" thru_hole circle (at 0 19.05) (size 4.4 4.4) (drill 2.2) (layers *.Cu *.Mask) (tstamp 85d5b42c-f4ec-42b5-9800-e12d981e2e36))
   (pad "1" thru_hole circle (at 0 -19.05) (size 4.4 4.4) (drill 2.2) (layers *.Cu *.Mask) (tstamp 98a7016d-39df-45ed-ba13-a22dd40115dc))
   (pad "1" thru_hole circle (at 19.05 0) (size 4.4 4.4) (drill 2.2) (layers *.Cu *.Mask) (tstamp 9e56777b-e04d-433a-8bbc-03b36565ee91))
-  (pad "1" thru_hole circle (at -19.05 0) (size 4.4 4.4) (drill 2.2) (layers *.Cu *.Mask) (tstamp cb217a51-585d-4625-9b30-7493376cf7d7))
+  ${p.use_three_holes ? '' :
+    '(pad "1" thru_hole circle (at -19.05 0) (size 4.4 4.4) (drill 2.2) (layers *.Cu *.Mask) (tstamp cb217a51-585d-4625-9b30-7493376cf7d7))'}
 )
 `
   }

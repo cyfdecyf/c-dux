@@ -153,9 +153,9 @@ outlines:
         - ref: thumbfan_home_thumb
           shift: [0.5 px, -0.7 py]
         - ref: matrix_pinky_bottom
-          shift: [0.5 px, -0.43 py]
+          shift: [0.5 px, -0.47 py]
         - ref: matrix_pinky_bottom
-          shift: [-0.47 px, -0.43 py]
+          shift: [-0.47 px, -0.47 py]
         - ref: matrix_pinky_outer_home
           shift: [0.35 px, -0.48 py]
         - ref: matrix_pinky_outer_home
@@ -165,9 +165,9 @@ outlines:
         - ref: matrix_pinky_outer_home
           shift: [0.35 px, 0.48 py]
         - ref: matrix_pinky_top
-          shift: [-0.46 px, 0.46 py]
+          shift: [-0.46 px, 0.47 py]
         - ref: matrix_pinky_top
-          shift: [0.57 px, 0.46 py]
+          shift: [0.57 px, 0.47 py]
         - ref: matrix_ring_top
           shift: [-0.49 px, 0.46 py]
         - ref: matrix_ring_top
