@@ -139,45 +139,45 @@ outlines:
       fillet: 2
       points:
         - ref: matrix_inner_top
-          shift: [-0.37 kx, 0.46 py + 1/6 ky]
+          shift: [-0.37 kx, 0.45 py + 1/6 ky]
         - ref: matrix_inner_top
-          shift: [33.2, 0.46 py + 1/6 ky]
+          shift: [33.2, 0.45 py + 1/6 ky]
         - ref: matrix_inner_top
           shift: [33.2, -3.5 ky]
         - ref: thumbfan_far_thumb
-          shift: [0.47 px, 0.5 py]
+          shift: [0.47 px, 0.45 py]
         - ref: thumbfan_far_thumb
-          shift: [0.47 px, -0.5 py]
+          shift: [0.47 px, -0.45 py]
         - ref: thumbfan_home_thumb
-          shift: [-0.6 px, -0.5 py]
+          shift: [-0.5 px, -0.45 py]
         - ref: matrix_pinky_bottom
-          shift: [0.5 px, -0.47 py]
+          shift: [0.5 px, -0.45 py]
         - ref: matrix_pinky_bottom
-          shift: [-0.47 px, -0.47 py]
+          shift: [-0.47 px, -0.45 py]
         - ref: matrix_pinky_outer_home
-          shift: [0.35 px, -0.48 py]
+          shift: [0.35 px, -0.45 py]
         - ref: matrix_pinky_outer_home
-          shift: [-0.47 px, -0.48 py]
+          shift: [-0.47 px, -0.45 py]
         - ref: matrix_pinky_outer_home
-          shift: [-0.47 px, 0.48 py]
+          shift: [-0.47 px, 0.45 py]
         - ref: matrix_pinky_outer_home
-          shift: [0.35 px, 0.48 py]
+          shift: [0.35 px, 0.45 py]
         - ref: matrix_pinky_top
-          shift: [-0.46 px, 0.47 py]
+          shift: [-0.47 px, 0.45 py]
         - ref: matrix_pinky_top
           shift: [0.35 px, 0.7 py]
         - ref: matrix_ring_top
-          shift: [-0.49 px, 0.46 py]
+          shift: [-0.45 px, 0.45 py]
         - ref: matrix_ring_top
-          shift: [ 0.55 px, 0.46 py]
+          shift: [ 0.55 px, 0.45 py]
         - ref: matrix_middle_top
-          shift: [-0.48 px, 0.46 py]
+          shift: [-0.47 px, 0.45 py]
         - ref: matrix_middle_top
-          shift: [ 0.47 px, 0.46 py]
+          shift: [ 0.47 px, 0.45 py]
         - ref: matrix_index_top
-          shift: [-0.54 px, 0.46 py]
+          shift: [-0.5 px, 0.45 py]
         - ref: matrix_index_top
-          shift: [0.54 kx, 0.46 py]
+          shift: [0.54 kx, 0.45 py]
   controller:
     - what: rectangle
       where:
