@@ -302,8 +302,8 @@ pcbs:
           use_three_holes: true
         where:
           ref: matrix_inner_bottom
-          shift: [-3.279, 3.203]
-          rotate: 309
+          shift: [-29.187, 15.944]
+          rotate: 179
       c_dux_text:
         what: ceoloide/utility_text
         params:
