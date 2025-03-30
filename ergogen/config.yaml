@@ -257,7 +257,7 @@ pcbs:
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
-          shift: [15.5, -10.25]
+          shift: [13.156, -4.973]
           rotate: 90
       power_button:
         what: power_switch_tht_top_self_lock
@@ -269,7 +269,7 @@ pcbs:
           PAD_2: BRAW
         where:
           ref: matrix_inner_bottom
-          shift: [17, -3]
+          shift: [29.12, -16.68]
           rotate: 90
       reset_button:
         what: reset_switch_smd_top
@@ -280,7 +280,7 @@ pcbs:
           PAD_3: GND
         where:
           ref: matrix_inner_top
-          shift: [17, 9.2]
+          shift: [17.85, 9.2]
           rotate: 180
       rotary_encoder:
         what: ceoloide/rotary_encoder_ec11_ec12
@@ -303,7 +303,7 @@ pcbs:
         where:
           ref: matrix_inner_bottom
           shift: [-3.279, 3.203]
-          rotate: 310
+          rotate: 309
       c_dux_text:
         what: ceoloide/utility_text
         params:
