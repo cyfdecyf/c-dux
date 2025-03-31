@@ -165,7 +165,7 @@ outlines:
         - ref: matrix_pinky_top
           shift: [-0.47 px, 0.45 py]
         - ref: matrix_pinky_top
-          shift: [0.35 px, 0.7 py]
+          shift: [0.25 px, 0.78 py]
         - ref: matrix_ring_top
           shift: [-0.45 px, 0.45 py]
         - ref: matrix_ring_top
@@ -244,7 +244,7 @@ pcbs:
           mcu_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Nice_Nano_V2.step
         where:
           ref: matrix_inner_top
-          shift: [20, -15.5]
+          shift: [20, -18.5]
           rotate: 0
       jst_bat:
         what: ceoloide/battery_connector_jst_ph_2
@@ -257,7 +257,7 @@ pcbs:
           BAT_N: GND
         where:
           ref: matrix_inner_bottom
-          shift: [12.156, -4.973]
+          shift: [12.156, -7]
           rotate: 90
       power_button:
         what: power_switch_tht_top_self_lock
@@ -269,7 +269,7 @@ pcbs:
           PAD_2: BRAW
         where:
           ref: matrix_inner_bottom
-          shift: [15.51, -14.55]
+          shift: [15.51, -15.55]
           rotate: 90
       reset_button:
         what: reset_switch_smd_top
@@ -325,25 +325,25 @@ pcbs:
           drill: 4.2
         where:
           ref: matrix_inner_top
-          shift: [25, 7.9]
+          shift: [25.34, 7.9]
       mounting_hole_inner_bottom:
         what: ceoloide/mounting_hole_plated
         params:
           drill: 4.2
         where:
           ref: matrix_inner_bottom
-          shift: [25, -21]
+          shift: [25.34, -20]
       mounting_hole_pinky_top:
         what: ceoloide/mounting_hole_plated
         params:
           drill: 4.2
         where:
           ref: matrix_index_bottom
-          shift: [-53.82, 20.14]
+          shift: [-55.249, 21.241]
       mounting_hole_pinky_bottom:
         what: ceoloide/mounting_hole_plated
         params:
           drill: 4.2
         where:
           ref: matrix_index_bottom
-          shift: [-35.93, -28.6]
+          shift: [-34.52, -28.666]
