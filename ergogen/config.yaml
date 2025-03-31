@@ -27,7 +27,7 @@ points:
             bind: [0.1, 0.5 kx, 0.1, 0.1]
           rows:
             home:
-              column_net: P18
+              column_net: P101
               shift: [0, ky]
         pinky:
           key:
@@ -36,11 +36,11 @@ points:
             bind: [0.1, 0.5 kx, 0.1, 0.1]
           rows:
             bottom:
-              column_net: P102
+              column_net: P15
             home:
-              column_net: P2
+              column_net: P18
             top:
-              column_net: P0
+              column_net: P19
         ring:
           key:
             stagger: ky
@@ -49,11 +49,11 @@ points:
             bind: [0.1, 0.5 kx, 0.1, 0.1]
           rows:
             bottom:
-              column_net: P101
+              column_net: P20
             home:
-              column_net: P3
+              column_net: P21
             top:
-              column_net: P1
+              column_net: P9
         middle:
           key:
             stagger: ky/3
@@ -63,11 +63,11 @@ points:
             shift: [0.2, 0]
           rows:
             bottom:
-              column_net: P7
+              column_net: P8
             home:
-              column_net: P4
+              column_net: P7
             top:
-              column_net: P21
+              column_net: P6
         index:
           key:
             stagger: -ky/3
@@ -76,11 +76,11 @@ points:
             bind: [0.1, 0.1, 0.5 kx, 0.5 kx]
           rows:
             bottom:
-              column_net: P8
+              column_net: P4
             home:
-              column_net: P5
+              column_net: P3
             top:
-              column_net: P20
+              column_net: P0
         inner:
           key:
             stagger: -ky/6
@@ -88,11 +88,11 @@ points:
             bind: [0.1, 0.1, 0.1, 0.5 kx]
           rows:
             bottom:
-              column_net: P9
+              column_net: P5
             home:
-              column_net: P6
+              column_net: P2
             top:
-              column_net: P19
+              column_net: P1
     thumbfan:
       anchor:
         ref: matrix_inner_bottom
@@ -105,17 +105,17 @@ points:
           key:
             splay: -15
             origin: [0 kx, -4.5 ky]
-            column_net: P107
+            column_net: P14
         near:
           key:
             splay: -15
             origin: [-0.5 kx, -0.57 ky]
-            column_net: P15
+            column_net: P16
         far:
           key:
             splay: -15
             origin: [-0.5 kx, -0.57 ky]
-            column_net: P14
+            column_net: P10
       rows:
         thumb:
           row_net: GND
@@ -288,9 +288,9 @@ pcbs:
           reversible: true
           # 3D model from https://github.com/foostan/kbd/blob/main/kicad-packages3D/kbd.3dshapes
           encoder_3dmodel_filename: ${KICAD8_3RD_PARTY}/3dmodels\kbd.3dshapes/RotarryEncoder_EC12-SW.step
-          A: P10
+          A: P102
           B: GND
-          C: P16
+          C: P107
         where:
           ref: matrix_index_bottom
           shift: [0, -28]
