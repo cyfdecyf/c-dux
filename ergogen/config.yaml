@@ -270,7 +270,7 @@ pcbs:
         where:
           ref: matrix_inner_bottom
           shift: [15.51, -15.55]
-          rotate: 90
+          rotate: 0
       reset_button:
         what: reset_switch_smd_top
         params:
