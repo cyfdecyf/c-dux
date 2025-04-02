@@ -293,7 +293,7 @@ pcbs:
           C: P107
         where:
           ref: matrix_index_bottom
-          shift: [0, -28]
+          shift: [0, -27]
           rotate: 90
       tening_puck:
         what: tenting_puck
