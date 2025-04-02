@@ -311,14 +311,14 @@ pcbs:
           reversible: true
         where:
           ref: matrix_index_bottom
-          shift: [-16.07, -15]
+          shift: [-21.07, -22]
       ergogen_logo:
         what: ceoloide/utility_ergogen_logo
         params:
           reversible: true
         where:
           ref: matrix_index_bottom
-          shift: [-15.75, -21.15]
+          shift: [-20.75, -28.15]
       mounting_hole_inner_top:
         what: ceoloide/mounting_hole_plated
         params:
