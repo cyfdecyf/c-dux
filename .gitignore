@@ -1,0 +1,7 @@
+*.kicad_mod
+fp-info-cache
+fabrication-toolkit-options.json
+*.kicad_prl
+*-backups
+production
+database
