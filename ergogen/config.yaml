@@ -222,7 +222,8 @@ pcbs:
           # Most opensource footprint uses 1.7mm diameter.
           # I measured my choc v1 switches and its 1.6mm not including the three tiny stems.
           # Using 1.7mm here is usable, but it's too tight in my opinion.
-          # Thus I increase it a little bit to see how it works.
+          # I've tried 1.74mm in C. Dux v2 and it's a little bit loose, especially if not using hotswap
+          # sockets. If I'm going to C. Dux v3, I will use 1.72mm.
           choc_v1_stabilizers_diameter: 1.74
           # 3D model from https://github.com/infused-kim/kb_ergogen_fp/tree/main/3d_models
           hotswap_3dmodel_filename: ${EG_INFUSED_KIM_3D_MODELS}/Choc_V1_Hotswap.step
