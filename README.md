@@ -97,6 +97,8 @@ a lot to relieve my RSI and I can work all day long without much pain in my fore
 
 ![C. Dux v2 in use](./images/c-dux-v2-in-use.jpg)
 
+![C. Dux v2 with M4 threaded bolts](./images/c-dux-v2-m4-bolts.jpg)
+
 ### C. Dux v1
 
 This is my first attempt to build a keyboard. The rotary encoder is difficult to reach
