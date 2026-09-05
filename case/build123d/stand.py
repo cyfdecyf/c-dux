@@ -6,13 +6,15 @@ posture / mounting / stability rationale), exported as STL (slicing) plus
 STEP, the preferred format for outsourced 3D printing (JLCPCB takes exact
 B-rep instead of faceted meshes).
 
-Two things this version does better than the .scad:
+Three things this version does better than the .scad:
   * All PCB data (M4 hole positions, board outline) is parsed directly from
     the KiCad PCB file at runtime, so a board revision can never silently
     desync the stand — the script asserts against the last hand-verified
     table and refuses to run if anything moved.
   * B-rep fillets: the base slab gets a rounded top perimeter, which CSG
     mesh tools cannot do.
+  * Reinforced base-plate junction for vertical typing loads: full-width
+    haunch, back-face ribs, deeper embed, front tension-corner fillet.
 
 Coordinate mapping (derived, not hard-coded — see parse_pcb):
     u = Y_kicad - Y_min          (horizontal, from the "top row" long edge)
@@ -87,10 +89,16 @@ base_front = 30
 base_rear = 65
 base_side = 18
 base_r = 10
-gusset_x = [-40, 0, 40]
-gusset_t = 5
-gusset_d = 18
-gusset_h = 25
+# Junction reinforcement — vertical typing hammers every keypress through
+# the backplate into the base-plate junction; the scad version only has the
+# small embed + 3 gussets for this.
+haunch_d = 18  # full-width haunch: depth along the base top
+haunch_h = 25  # haunch height up the plate back face
+rib_x = [-52, -26, 0, 26, 52]
+rib_t = 8  # rib thickness (X)
+rib_d = 22  # rib depth along the base top
+rib_h = 60  # rib height up the plate back face
+front_fillet_r = 2.5  # radius on the tension-side (front) junction corner
 pad_d = 20
 pad_recess = 0.8
 coin_x = 24
@@ -101,7 +109,7 @@ label_text = 'C.DUX'
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 EPS = 0.01
-EMBED = 2.5  # how deep the plate sinks into the base top
+EMBED = 4.0  # how deep the plate sinks into the base top (deeper = stronger junction)
 
 MIN = Align.MIN
 
@@ -265,14 +273,31 @@ class Stand:
                 align=(MIN, MIN, MIN),
             )
         rad = math.radians(self.tilt)
-        apex = (gusset_h * math.sin(rad), gusset_h * math.cos(rad))
-        for gx in gusset_x:
-            tri = Polygon((0, 0), (gusset_d, 0), apex, align=None)
-            # Triangle in the YZ plane: base along the base top, apex up the
-            # tilted backplate's back face; both anchor edges sit inside the
-            # solids so the union fuses cleanly.
-            base += Pos(gx - gusset_t / 2, -2, base_t - 1) * extrude(
-                Plane.YZ * tri, gusset_t
+
+        def wedge(depth: float, height: float):
+            # Profile in the YZ plane: base along the base top, apex up the
+            # tilted backplate's back face; anchor edges sit inside the
+            # solids so the union fuses cleanly, and every face is
+            # support-free as printed.
+            return Polygon(
+                (0, 0),
+                (depth, 0),
+                (height * math.sin(rad), height * math.cos(rad)),
+                align=None,
+            )
+
+        # Full-width(= plate width)haunch: fills the junction inner corner
+        # so typing loads bend a shallow ramp instead of prying open a
+        # knife-edge corner. Kept flush with the plate sides — wider than
+        # that, the haunch apex would stand exposed as a fragile fin.
+        base += Pos(-self.plate_w / 2, -2, base_t - 1) * extrude(
+            Plane.YZ * wedge(haunch_d, haunch_h), self.plate_w
+        )
+        # Ribs continue up the back face into the hammering zone (thumb /
+        # bottom rows sit just above the junction).
+        for rx in rib_x:
+            base += Pos(rx - rib_t / 2, -2, base_t - 1) * extrude(
+                Plane.YZ * wedge(rib_d, rib_h), rib_t
             )
         return base
 
@@ -290,6 +315,26 @@ class Stand:
             return part
         return part + extrude(sketch, 0.9)
 
+    def fillet_front_junction(self, body):
+        """Round the concave edge where the plate front face meets the base
+        top. Typing pries the plate forward, so this tension-side corner
+        should not stay a knife edge."""
+        edges = [
+            e
+            for e in body.edges().filter_by(Axis.X)
+            if abs(e.center().Z - base_t) < 0.2
+            and -7 < e.center().Y < -1
+            and e.length > 50  # skip slivers beside the plate's rounded corners
+        ]
+        if not edges:
+            print('warning: front junction edge not found — fillet skipped')
+            return body
+        try:
+            return fillet(edges, front_fillet_r)
+        except Exception as exc:
+            print(f'warning: front junction fillet failed ({exc}) — skipped')
+            return body
+
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
@@ -302,6 +347,7 @@ class Stand:
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
+        body = self.fillet_front_junction(body)
         if side == 'right':
             body = mirror(body, about=Plane.YZ)
         return self.emboss_label(body)
