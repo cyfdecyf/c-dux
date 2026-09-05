@@ -1,3 +1,13 @@
+tmp/
+.zcode
+
+# macOS
+.DS_Store
+.AppleDouble
+._*
+Icon?
+*.icloud
+
 *.kicad_mod
 fp-info-cache
 fabrication-toolkit-options.json
@@ -6,3 +16,8 @@ fabrication-toolkit-options.json
 production
 database
 ergogen/output/outlines
+
+# Python / build123d (case/build123d)
+.venv/
+__pycache__/
+case/build123d/out/

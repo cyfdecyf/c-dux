@@ -1,0 +1,13 @@
+[project]
+name = "c-dux-stand"
+version = "0.1.0"
+description = "C. Dux vertical keyboard stand — build123d model, exports STL + STEP (JLCPCB)"
+requires-python = ">=3.11"
+dependencies = [
+    "build123d==0.11.1",
+]
+
+[dependency-groups]
+dev = [
+    "ocp-vscode>=4.0.1",
+]

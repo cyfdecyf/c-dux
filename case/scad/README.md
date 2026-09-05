@@ -2,8 +2,9 @@
 
 ![preview](preview.png)
 
-`stand.scad` 是 `case/stand.py`(build123d)之外的另一个底座方案,用 **OpenSCAD**
-实现,**不需要 Python 环境**,装个 OpenSCAD 就能改参数、出 STL。
+`stand.scad` 是垂直站立底座的 OpenSCAD 实现,**不需要 Python 环境**,装个
+OpenSCAD 就能改参数、出 STL。同一设计的 Python/build123d 实现在
+[`case/build123d/`](../build123d/),额外导出 STEP 供代打。
 
 ## 设计:垂直(dodo 式)站姿
 
@@ -88,8 +89,12 @@ KiCad 的 Y 轴朝下,而且垂直站姿是把板子**旋转 90°** 站起来的
 
 板框 154.0 × 112.5 mm;USB 出线点 `[18.26, 31.66]`(仅作预览标记)。
 
-## 与 build123d 版(`case/stand.py`)的关系
+## 与 build123d 版(`case/build123d/`)的关系
 
-两套方案独立、互不依赖:本版针对"垂直站姿"重新设计(旧版是后仰桌面板 +
-书挡翼),没有参考旧版几何。孔位数据同源(同一份 `c-dux.kicad_pcb`)。
-哪个满意打哪个;参数都在文件顶部,Customizer 即可完成调整。
+同一垂直设计的两套实现,参数同名同默认:本版单文件、零 Python 依赖、
+Customizer 拖滑块调参;[`case/build123d/`](../build123d/) 用 uv 管理,
+导出 **STEP**(代打首选格式)并加了 B-rep 圆角,孔位/板框直接从
+`pcb/v2.0/c-dux.kicad_pcb` 解析并内置断言。哪个顺手用哪个。
+
+(本节旧版提到的 `case/stand.py` —— 后仰桌面板 + 书挡翼 —— 从未提交到
+仓库,该方案已不存在。)
