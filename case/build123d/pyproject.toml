@@ -9,5 +9,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "matplotlib>=3.11.1",
     "ocp-vscode>=4.0.1",
 ]

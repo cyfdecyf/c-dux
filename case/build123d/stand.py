@@ -16,9 +16,11 @@ Three things this version does better than the .scad:
   * Reinforced base-plate junction for vertical typing loads: full-width
     haunch, back-face ribs, deeper embed, front tension-corner fillet.
 
-Coordinate mapping (derived, not hard-coded — see parse_pcb):
-    u = Y_kicad - Y_min          (horizontal, from the "top row" long edge)
-    v = X_max - X_kicad          (height, from the controller inner edge)
+Coordinate mapping (derived, not hard-coded — see parse_pcb). Mounting
+orientation per user: the single extra pinky key on its stalk faces DOWN,
+the 3-key thumb cluster faces UP (both axes flipped vs the KiCad view):
+    u = Y_max - Y_kicad          (horizontal)
+    v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
@@ -60,13 +62,18 @@ from build123d import (
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_PCB = REPO / 'pcb' / 'v2.0' / 'c-dux.kicad_pcb'
 
-# Last hand-verified hole table (case/scad/README.md). The parsed values must
-# match these within TOL or the script aborts — that's the desync tripwire.
+# Mounting holes, stand coordinates [u, v] — mounting orientation per user:
+# the single extra pinky key (on its stalk) faces DOWN, the 3-key thumb
+# cluster faces UP, so both axes are flipped w.r.t. the KiCad view:
+#   u = Y_max - Y_kicad   (horizontal)
+#   v = X_kicad - X_min   (height above the stalk edge)
+# The MCU/JST/USB end (v≈31 in KiCad terms) therefore sits mid-high on the
+# finished stand.
 HOLES_EXPECTED = {
-    'H1': (9.06, 26.12),  # inner top    -> stand bottom left
-    'H2': (70.96, 26.12),  # inner bottom -> stand bottom right
-    'H3': (26.88, 124.71),  # pinky top    -> stand upper left
-    'H4': (76.79, 103.98),  # pinky bottom -> stand upper right
+    'H1': (103.44, 127.88),  # inner top    -> upper right (stand frame)
+    'H2': (41.54, 127.88),   # inner bottom -> upper left
+    'H3': (85.62, 29.29),    # pinky top    -> lower right
+    'H4': (35.71, 50.02),    # pinky bottom -> lower center-left
 }
 PCB_W_EXPECTED = 112.5
 PCB_H_EXPECTED = 154.0
@@ -95,7 +102,7 @@ base_r = 10
 # small embed + 3 gussets for this.
 haunch_d = 18  # full-width haunch: depth along the base top
 haunch_h = 25  # haunch height up the plate back face
-rib_x = [-52, -26, 0, 26, 52]
+rib_x = [-56, -38, -6, 14, 56]  # avoids the flipped H3/H4 post zones (x 21..38, -29..-12)
 rib_t = 8  # rib thickness (X)
 rib_d = 22  # rib depth along the base top
 rib_h = 60  # rib height up the plate back face
@@ -152,8 +159,8 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
         ref = re.search(r'\(property "Reference"\s+"([^"]+)"', head)
         if at and ref:
             x, y = float(at.group(1)), float(at.group(2))
-            u = y - min(ys)
-            v = max(xs) - x
+            u = max(ys) - y
+            v = x - min(xs)
             holes[ref.group(1)] = (u, v)
 
     missing = set(HOLES_EXPECTED) - set(holes)
