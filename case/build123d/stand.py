@@ -76,7 +76,8 @@ SIZE_TOL = 0.5
 # --- geometry parameters, same names/defaults as case/scad/stand.scad ---------
 plate_t = 6
 plate_margin = 10
-bottom_ext = 8
+bottom_ext = 6.5  # plate below the PCB bottom edge; with base_t=8 the tilt=0
+#                  posture clears the base top by 2.5 mm (the tightest case)
 top_ext = 12
 plate_r = 8
 post_d = 12
@@ -84,10 +85,10 @@ nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
 tap_d = 3.4
-base_t = 10
-base_front = 30
+base_t = 8  # lower base top = lower keyboard; 8 keeps 2.3 mm walls around the coin slots
+base_front = 40  # deeper towards the user: support polygon under the hands
 base_rear = 65
-base_side = 18
+base_side = 24  # wider stance against lateral rocking while typing
 base_r = 10
 # Junction reinforcement — vertical typing hammers every keypress through
 # the backplate into the base-plate junction; the scad version only has the
