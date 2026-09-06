@@ -6,7 +6,7 @@ posture / mounting / stability rationale), exported as STL (slicing) plus
 STEP, the preferred format for outsourced 3D printing (JLCPCB takes exact
 B-rep instead of faceted meshes).
 
-Three things this version does better than the .scad:
+Things this version does better than the .scad:
   * All PCB data (M4 hole positions, board outline) is parsed directly from
     the KiCad PCB file at runtime, so a board revision can never silently
     desync the stand — the script asserts against the last hand-verified
@@ -15,23 +15,42 @@ Three things this version does better than the .scad:
     mesh tools cannot do.
   * Reinforced base-plate junction for vertical typing loads: full-width
     haunch, back-face ribs, deeper embed, front tension-corner fillet.
+  * Multiple mounting sets: the 4-hole pattern is repeated at several
+    in-plane rotation angles, so the keyboard (and with it the home row)
+    can be re-mounted at a different tilt.
 
-Coordinate mapping (derived, not hard-coded — see parse_pcb). Mounting
-orientation per user: the single extra pinky key on its stalk faces DOWN,
-the 3-key thumb cluster faces UP (both axes flipped vs the KiCad view):
+Mounting orientation (per user): the single extra pinky key on its stalk
+faces DOWN, the 3-key thumb cluster faces UP.
+
+Coordinate mapping (derived, not hard-coded — see parse_pcb); both axes
+flipped vs the KiCad view per the mounting orientation above:
     u = Y_max - Y_kicad          (horizontal)
     v = X_kicad - X_min          (height, from the stalk-key edge)
+
+Rotation sets — why 10 deg steps: one post set per angle, each set being
+the 4-hole pattern rotated about its centroid. 5-deg steps are impossible
+with 12 mm posts: adjacent sets' identical holes land only 4-5 mm apart and
+the posts would merge into a wall. 10-deg steps work when each set also
+slides sideways a little (SET_U_STEP); the solver shifts per set and raises
+it per set so that
+  * every post keeps >= 12 mm to every other post,
+  * the rotated board's lowest corner clears the base top by 2.5 mm
+    (rotation swings a board corner 8-17 mm below the nominal edge),
+  * each set's bottom post line stays >= 43 mm above the desk.
+The sets therefore staircase slightly upward with increasing angle.
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
     uv run stand.py                          # left half, tilt=20, full
     uv run stand.py --side right --tilt 0
     uv run stand.py --part fit               # flat validation plate + posts
+    uv run stand.py --set-angles 10,20,30    # custom rotation sets
 """
 
 from __future__ import annotations
 
 import argparse
+import itertools
 import math
 import re
 import sys
@@ -62,13 +81,9 @@ from build123d import (
 REPO = Path(__file__).resolve().parents[2]
 DEFAULT_PCB = REPO / 'pcb' / 'v2.0' / 'c-dux.kicad_pcb'
 
-# Mounting holes, stand coordinates [u, v] — mounting orientation per user:
-# the single extra pinky key (on its stalk) faces DOWN, the 3-key thumb
-# cluster faces UP, so both axes are flipped w.r.t. the KiCad view:
-#   u = Y_max - Y_kicad   (horizontal)
-#   v = X_kicad - X_min   (height above the stalk edge)
-# The MCU/JST/USB end (v≈31 in KiCad terms) therefore sits mid-high on the
-# finished stand.
+# Last hand-verified hole table (flipped stand frame — see coordinate note
+# above). The parsed values must match within TOL or the script aborts —
+# that's the desync tripwire.
 HOLES_EXPECTED = {
     'H1': (103.44, 127.88),  # inner top    -> upper right (stand frame)
     'H2': (41.54, 127.88),   # inner bottom -> upper left
@@ -96,17 +111,14 @@ base_t = 8  # lower base top = lower keyboard; 8 keeps 2.3 mm walls around the c
 base_front = 40  # deeper towards the user: support polygon under the hands
 base_rear = 65
 base_side = 24  # wider stance against lateral rocking while typing
-base_r = 10
-# Junction reinforcement — vertical typing hammers every keypress through
-# the backplate into the base-plate junction; the scad version only has the
-# small embed + 3 gussets for this.
+base_r = 10  # base slab corner radius (plan view)
+# Junction reinforcement — vertical typing hammers the base-plate junction;
+# the scad version only has the small embed + 3 gussets for this.
 haunch_d = 18  # full-width haunch: depth along the base top
-haunch_h = 25  # haunch height up the plate back face
-rib_x = [-56, -38, -6, 14, 56]  # avoids the flipped H3/H4 post zones (x 21..38, -29..-12)
-rib_t = 8  # rib thickness (X)
-rib_d = 22  # rib depth along the base top
-rib_h = 60  # rib height up the plate back face
-front_fillet_r = 2.5  # radius on the tension-side (front) junction corner
+haunch_h = 25  # haunch height up the plate back face (auto-capped if a post
+#               set places a low hole over the ridge)
+rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
+#            clear every post of every rotation set
 pad_d = 20
 pad_recess = 0.8
 coin_x = 24
@@ -119,6 +131,21 @@ base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 EPS = 0.01
 EMBED = 4.0  # how deep the plate sinks into the base top (deeper = stronger junction)
 
+# --- rotation sets -------------------------------------------------------------
+# One post set per angle; the keyboard is re-mounted on the chosen set to
+# tilt the home row. Angles are CCW in the front view — negate the list to
+# mirror the tilt direction. See the module docstring for why 5-deg steps
+# are impossible.
+SET_ANGLES = [10, 20, 30, 40]  # deg, CCW in front view (negate to mirror tilt)
+MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
+SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
+SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
+PLATE_HALF_BOUND = 72.0  # max post |x| so the plate stays on the base
+BASE_TOP_MARGIN = 2.5  # rotated board corner vs base top
+LINE_H_DESK = 43.0  # min height of a set's bottom post line above the desk
+RIB_TARGET = 5  # ribs wanted (auto-placed; may be fewer if posts crowd the plate)
+
+EPS = 0.01
 MIN = Align.MIN
 
 
@@ -128,7 +155,7 @@ MIN = Align.MIN
 
 
 def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
-    """Return (pcb_w, pcb_h, [(u, v) per H1..H4]) from a KiCad PCB file."""
+    """Return (pcb_w, pcb_h, [(u, v) x4]) from a KiCad PCB file."""
     text = path.read_text()
 
     # Board outline: ergogen exports Edge.Cuts as gr_line/gr_arc segments
@@ -198,22 +225,140 @@ class Stand:
         tilt: float,
         post_h: float,
         attach: str,
+        set_angles: list[float],
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.tilt = tilt
         self.post_h = post_h
         self.attach = attach
 
-        self.embed_origin_z = base_t - EMBED
-        self.plate_w = pcb_w + 2 * plate_margin
+        self.origin_z = base_t - EMBED
         self.plate_h = bottom_ext + pcb_h + top_ext
         self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
+        self.ct, self.st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
 
-    def hole_xy(self, hole: tuple[float, float]) -> tuple[float, float]:
-        u, v = hole
-        return u - self.pcb_w / 2, v + bottom_ext
+        self.sets, self.set_meta = self._solve_sets(set_angles)
+        self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
+        # plate must cover every post with room for the 6 mm radius + margin
+        self.plate_half = max(pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + 8)
+        self.plate_w = 2 * self.plate_half
+        if self.plate_half > self.bx / 2 - 0.5:
+            print(
+                f'warning: rotation sets need plate half-width {self.plate_half:.1f} '
+                f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
+            )
+        self.rib_x = self._auto_ribs()
+        if len(self.rib_x) < 3:
+            print(f'warning: only {len(self.rib_x)} ribs fit around the post sets')
+        self.haunch_h = self._cap_haunch()
+
+    # -- rotation-set layout solver ------------------------------------------
+
+    def _solve_sets(self, angles: list[float]) -> list[tuple[float, list[tuple[float, float]]]]:
+        """Place one 4-hole set per angle: rotate about the pattern centroid,
+        then pack — each set slides laterally (brute force over a shift grid)
+        and rises so that (a) the rotated board's lowest corner clears the
+        base top, (b) its bottom post line stays LINE_H_DESK above the desk,
+        and (c) all posts keep MIN_POST_CENTER apart. Optimizes for the
+        largest minimum post distance, tie-broken by a compact span."""
+        cu = sum(u for u, _ in self.holes) / len(self.holes)
+        cv = sum(v for _, v in self.holes) / len(self.holes)
+        rel = [(u - cu, v - cv) for u, v in self.holes]
+        corners = [
+            (-self.pcb_w / 2, -cv),
+            (self.pcb_w / 2, -cv),
+            (self.pcb_w / 2, self.pcb_h - cv),
+            (-self.pcb_w / 2, self.pcb_h - cv),
+        ]
+        # v' the lowest board corner may reach: the plate back face at that
+        # corner must stay BASE_TOP_MARGIN above the base top
+        v_floor = (base_t + BASE_TOP_MARGIN - self.origin_z - 11 * self.st) / self.ct - bottom_ext
+
+        lifted = []
+        for ang in angles:
+            r = math.radians(ang)
+            pts = [
+                (cu + dx * math.cos(r) - dy * math.sin(r),
+                 cv + dx * math.sin(r) + dy * math.cos(r))
+                for dx, dy in rel
+            ]
+            vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
+            lift = max(0.0, v_floor - vmin)
+            low = sorted(v for _, v in pts)[:2]
+            line_z = min(self.origin_z + (y + bottom_ext) * self.ct + 11 * self.st for y in low)
+            if line_z < LINE_H_DESK:
+                lift += (LINE_H_DESK - line_z) / self.ct
+            lifted.append((ang, lift, [(u, v + lift) for u, v in pts]))
+
+        cands = [
+            s * SHIFT_GRID
+            for s in range(int(-SHIFT_SPAN / SHIFT_GRID), int(SHIFT_SPAN / SHIFT_GRID) + 1)
+        ]
+        best, best_key = None, None
+        for combo in itertools.product(cands, repeat=len(angles)):
+            posts = [
+                (u + s - self.pcb_w / 2, v + bottom_ext)
+                for (_, _, pts), s in zip(lifted, combo)
+                for u, v in pts
+            ]
+            if max(abs(x) for x, _ in posts) > PLATE_HALF_BOUND - 8:
+                continue
+            dmin = min(
+                math.dist(posts[i], posts[j])
+                for i in range(len(posts))
+                for j in range(i + 1, len(posts))
+            )
+            if dmin < MIN_POST_CENTER:
+                continue
+            key = (min(dmin, 20.0), -(max(combo) - min(combo)))
+            if best_key is None or key > best_key:
+                best, best_key = combo, key
+        if best is None:
+            sys.exit(
+                'error: no post arrangement fits these rotation angles — '
+                'try fewer sets or smaller steps (--set-angles)'
+            )
+        out = []
+        meta = []
+        for (ang, lift, pts), s in zip(lifted, best):
+            out.append((ang, [(u + s - self.pcb_w / 2, v + bottom_ext) for u, v in pts]))
+            meta.append((ang, s, lift))
+        return out, meta
+
+    # -- rib / haunch auto-placement ------------------------------------------
+
+    def _auto_ribs(self) -> list[float]:
+        """Rib x positions: farthest-point sampling over the x candidates that
+        keep >= 12 mm sideways to every post passing through the rib band."""
+        band_lo, band_hi = 3 - 6, 63.4 + 6  # rib band incl. post radius
+        zone = [(x, y) for x, y in self.all_posts if band_lo <= y <= band_hi]
+        lo, hi = -(self.plate_half - 12), self.plate_half - 12
+        cand = []
+        for i in range(int((hi - lo) / 2) + 1):
+            x = lo + 2 * i
+            if all(abs(x - px) >= 12 for px, _ in zone):
+                cand.append(x)
+        if not cand:
+            return []
+        chosen = [max(cand)]  # start at the left edge of the free strip
+        while len(chosen) < RIB_TARGET:
+            nxt = max(cand, key=lambda x: min(abs(x - c) for c in chosen))
+            if min(abs(nxt - c) for c in chosen) < 15:
+                break
+            chosen.append(nxt)
+        return sorted(chosen)
+
+    def _cap_haunch(self) -> float:
+        """Cap the haunch height so its ridge never runs behind a post's
+        screw clearance hole on the plate back face."""
+        min_y = min(y for _, y in self.all_posts)
+        y_top = min_y - 3
+        h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
+        return max(10.0, min(haunch_h, h))
+
+    # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
         px = self.bx / 2 - base_r - 4
@@ -227,8 +372,8 @@ class Stand:
         solid = Pos(0, self.plate_h / 2, 0) * extrude(
             RectangleRounded(self.plate_w, self.plate_h, plate_r), plate_t
         )
-        for hole in self.holes:
-            x, y = self.hole_xy(hole)
+        for hole in self.all_posts:
+            x, y = hole
             solid += Pos(x, y, plate_t) * (
                 Cylinder(post_d / 2, self.post_h, align=(Align.CENTER, Align.CENTER, MIN))
                 + Cone(
@@ -239,8 +384,8 @@ class Stand:
                 )
             )
         top = plate_t + self.post_h
-        for hole in self.holes:
-            x, y = self.hole_xy(hole)
+        for hole in self.all_posts:
+            x, y = hole
             if self.attach == 'nut':
                 # Hex pocket open at the post top: drop the M4 nut in, drive
                 # the screw through the PCB into it.
@@ -294,34 +439,19 @@ class Stand:
                 align=None,
             )
 
-        # Full-width(= plate width)haunch: fills the junction inner corner
+        # Full-width (= plate width) haunch: fills the junction inner corner
         # so typing loads bend a shallow ramp instead of prying open a
         # knife-edge corner. Kept flush with the plate sides — wider than
         # that, the haunch apex would stand exposed as a fragile fin.
         base += Pos(-self.plate_w / 2, -2, base_t - 1) * extrude(
-            Plane.YZ * wedge(haunch_d, haunch_h), self.plate_w
+            Plane.YZ * wedge(haunch_d, self.haunch_h), self.plate_w
         )
-        # Ribs continue up the back face into the hammering zone (thumb /
-        # bottom rows sit just above the junction).
-        for rx in rib_x:
+        # Ribs continue up the back face into the hammering zone.
+        for rx in self.rib_x:
             base += Pos(rx - rib_t / 2, -2, base_t - 1) * extrude(
-                Plane.YZ * wedge(rib_d, rib_h), rib_t
+                Plane.YZ * wedge(rib_t + 14, 60), rib_t
             )
         return base
-
-    def emboss_label(self, part):
-        if not label_text:
-            return part
-        try:
-            # Front face of the base, normal towards the user (-Y). Built as
-            # one Plane — mixing Pos with a Plane composes the offset in the
-            # plane's local frame, which silently misplaces the text.
-            plane = Plane((0, self.y0, 2), x_dir=(1, 0, 0), z_dir=(0, -1, 0))
-            sketch = plane * Text(label_text, font_size=6, align=(Align.CENTER, MIN))
-        except Exception as exc:  # no usable system font — skip, not fatal
-            print(f'warning: label skipped ({exc})')
-            return part
-        return part + extrude(sketch, 0.9)
 
     def fillet_front_junction(self, body):
         """Round the concave edge where the plate front face meets the base
@@ -343,6 +473,20 @@ class Stand:
             print(f'warning: front junction fillet failed ({exc}) — skipped')
             return body
 
+    def emboss_label(self, part):
+        if not label_text:
+            return part
+        try:
+            # Front face of the base, normal towards the user (-Y). Built as
+            # one Plane — mixing Pos with a Plane composes the offset in the
+            # plane's local frame, which silently misplaces the text.
+            plane = Plane((0, self.y0, 2), x_dir=(1, 0, 0), z_dir=(0, -1, 0))
+            sketch = plane * Text(label_text, font_size=6, align=(Align.CENTER, MIN))
+        except Exception as exc:  # no usable system font — skip, not fatal
+            print(f'warning: label skipped ({exc})')
+            return part
+        return part + extrude(sketch, 0.9)
+
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
@@ -351,7 +495,7 @@ class Stand:
             return mirror(body, about=Plane.YZ) if side == 'right' else body
         body = (
             self.base_solid()
-            + Pos(0, 0, self.embed_origin_z)
+            + Pos(0, 0, self.origin_z)
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
@@ -359,6 +503,9 @@ class Stand:
         if side == 'right':
             body = mirror(body, about=Plane.YZ)
         return self.emboss_label(body)
+
+
+front_fillet_r = 2.5  # radius on the tension-side (front) junction corner
 
 
 def summary(name: str, part) -> None:
@@ -423,10 +570,27 @@ def main() -> None:
         action='store_true',
         help='push to the OCP CAD Viewer instead of exporting',
     )
+    ap.add_argument(
+        '--set-angles',
+        type=str,
+        default=','.join(str(a) for a in SET_ANGLES),
+        help='comma-separated rotation angles (deg) of the mounting sets',
+    )
     args = ap.parse_args()
 
+    set_angles = [float(a) for a in args.set_angles.split(',')]
+    if len(set_angles) < 1:
+        sys.exit('error: --set-angles needs at least one angle')
+
     pcb_w, pcb_h, holes = parse_pcb(args.pcb)
-    stand = Stand(pcb_w, pcb_h, holes, args.tilt, args.post_h, args.attach)
+    stand = Stand(pcb_w, pcb_h, holes, args.tilt, args.post_h, args.attach, set_angles)
+
+    for ang, pts in stand.sets:
+        ys = sorted(y for _, y in pts)
+        line_z = stand.origin_z + ys[1] * stand.ct + 11 * stand.st
+        print(f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
+              f'{max(x for x, _ in pts):7.2f}]  bottom-line z={line_z:6.2f} mm')
+    print(f'ribs at x = {stand.rib_x}  | haunch_h = {stand.haunch_h:.1f} mm')
 
     part = stand.build(args.part, args.side)
     stem = (
