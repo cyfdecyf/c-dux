@@ -108,7 +108,7 @@ screw_d = 4.5
 tap_d = 3.4
 base_t = 8  # lower base top = lower keyboard; 8 keeps 2.3 mm walls around the coin slots
 base_front = 40  # deeper towards the user: support polygon under the hands
-base_rear = 65
+base_rear = 78  # rearward depth: houses the 27 mm coin slots fully + tip-over arm
 base_side = 24  # wider stance against lateral rocking while typing
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-plate junction;
@@ -123,7 +123,7 @@ pad_recess = 0.8
 coin_x = 24
 coin_w = 27
 coin_h = 3.4
-coin_depth = 14
+coin_depth = 27  # slot depth: fully buries a 25 mm coin lying flat (2 mm play)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 EPS = 0.01
