@@ -41,8 +41,8 @@ The sets therefore staircase slightly upward with increasing angle.
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
-    uv run stand.py                          # left half, tilt=20, full
-    uv run stand.py --side right --tilt 0
+    uv run stand.py                          # left half, full (tilt fixed 20°)
+    uv run stand.py --side right
     uv run stand.py --part fit               # flat validation plate + posts
     uv run stand.py --set-angles 10,20,30    # custom rotation sets
 """
@@ -134,13 +134,16 @@ EMBED = 4.0  # how deep the plate sinks into the base top (deeper = stronger jun
 # tilt the home row. Angles are CCW in the front view — negate the list to
 # mirror the tilt direction. See the module docstring for why 5-deg steps
 # are impossible.
-SET_ANGLES = [10, 20, 30, 40]  # deg, CCW in front view (negate to mirror tilt)
+TILT = 20.0  # stand recline from vertical, deg — fixed by design
+SET_ANGLES = [10, 20, 30]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
 PLATE_HALF_BOUND = 72.0  # max post |x| so the plate stays on the base
-BASE_TOP_MARGIN = 2.5  # rotated board corner vs base top
-LINE_H_DESK = 43.0  # min height of a set's bottom post line above the desk
+BASE_TOP_MARGIN = 2.0  # rotated board's lowest point vs base top — the ONLY
+#                        height constraint: clear the base, sit as low as
+#                        possible (the old 43 mm bottom-line rule applied only
+#                        to a base-parallel, unrotated mounting)
 RIB_TARGET = 5  # ribs wanted (auto-placed; may be fewer if posts crowd the plate)
 
 EPS = 0.01
@@ -220,13 +223,12 @@ class Stand:
         pcb_w: float,
         pcb_h: float,
         holes: list[tuple[float, float]],
-        tilt: float,
         post_h: float,
         attach: str,
         set_angles: list[float],
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
-        self.tilt = tilt
+        self.tilt = TILT
         self.post_h = post_h
         self.attach = attach
 
@@ -235,7 +237,7 @@ class Stand:
         self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
-        self.ct, self.st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
+        self.ct, self.st = math.cos(math.radians(TILT)), math.sin(math.radians(TILT))
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
@@ -282,12 +284,8 @@ class Stand:
                  cv + dx * math.sin(r) + dy * math.cos(r))
                 for dx, dy in rel
             ]
-            vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
-            lift = max(0.0, v_floor - vmin)
-            low = sorted(v for _, v in pts)[:2]
-            line_z = min(self.origin_z + (y + bottom_ext) * self.ct + 11 * self.st for y in low)
-            if line_z < LINE_H_DESK:
-                lift += (LINE_H_DESK - line_z) / self.ct
+            vmin = min(dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
+            lift = max(0.0, v_floor - (cv + vmin))
             lifted.append((ang, lift, [(u, v + lift) for u, v in pts]))
 
         cands = [
@@ -321,8 +319,11 @@ class Stand:
         out = []
         meta = []
         for (ang, lift, pts), s in zip(lifted, best):
+            r = math.radians(ang)
+            vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
+            corner_z = self.origin_z + (bottom_ext + vmin + lift) * self.ct + 11 * self.st
             out.append((ang, [(u + s - self.pcb_w / 2, v + bottom_ext) for u, v in pts]))
-            meta.append((ang, s, lift))
+            meta.append((ang, s, lift, round(corner_z, 2)))
         return out, meta
 
     # -- rib / haunch auto-placement ------------------------------------------
@@ -528,12 +529,6 @@ def main() -> None:
         help="'fit' = flat validation plate + posts only",
     )
     ap.add_argument(
-        '--tilt',
-        type=float,
-        default=20,
-        help='recline from vertical, degrees (0 = upright)',
-    )
-    ap.add_argument(
         '--post-h', type=float, default=5, help='post height = PCB-to-plate gap'
     )
     ap.add_argument(
@@ -567,21 +562,15 @@ def main() -> None:
         sys.exit('error: --set-angles needs at least one angle')
 
     pcb_w, pcb_h, holes = parse_pcb(args.pcb)
-    stand = Stand(pcb_w, pcb_h, holes, args.tilt, args.post_h, args.attach, set_angles)
+    stand = Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles)
 
-    for ang, pts in stand.sets:
-        ys = sorted(y for _, y in pts)
-        line_z = stand.origin_z + ys[1] * stand.ct + 11 * stand.st
+    for (ang, pts), (_, _, _, corner_z) in zip(stand.sets, stand.set_meta):
         print(f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
-              f'{max(x for x, _ in pts):7.2f}]  bottom-line z={line_z:6.2f} mm')
-    print(f'ribs at x = {stand.rib_x}  | haunch_h = {stand.haunch_h:.1f} mm')
+              f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm')
+    print(f'ribs at x = {[round(x, 1) for x in stand.rib_x]}  | haunch_h = {stand.haunch_h:.1f} mm')
 
     part = stand.build(args.part, args.side)
-    stem = (
-        f'stand_{args.side}_tilt{int(round(args.tilt))}_{args.part}'
-        if args.part == 'full'
-        else f'stand_{args.side}_fit'
-    )
+    stem = f'stand_{args.side}_{args.part}'
     summary(stem, part)
     if args.show:
         push_viewer(part, stem)
