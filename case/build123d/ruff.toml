@@ -1,0 +1,42 @@
+line-length    = 90
+target-version = "py313"
+
+[lint]
+ignore = [
+  "E501", # compatible with Black
+  "ERA001",   # flake8-eradicate/eradicate
+  "RUF003",   # ambiguous-unicode-character-comment
+]
+select = [
+  "I",     # isort
+  "N",     # pep8-naming
+  "PGH",   # pygrep
+  "UP",    # pyupgrade
+  "EM101", # raw-string-in-exception
+  "RUF",   # ruff checks
+  "E",     # pycodestyle(error)
+  "W",     # pycodestyle(warning)
+  "F",     # pyflakes
+  "B",     # flake8-bugbear
+  "C4",    # flake8-comprehensions
+  "FA100", # flake8-future-annotations
+  "PIE",   # flake8-pie
+  "PYI",   # flake8-pyi
+  "RET",   # flake8-return
+  "FBT",   # flake8-boolean-trap
+  "SIM",   # flake8-simplify
+  "TCH",   # flake8-type-checking
+  "TID",   # flake8-tidy-imports
+]
+unfixable = [
+  "ERA", # do not autoremove commented out code
+]
+allowed-confusables = ["，", "。", "、", "；", "：", "？", "！", "（", "）", "【", "】", "《", "》"]
+
+[lint.isort]
+known-first-party   = ["fotil"]
+lines-after-imports = 2
+lines-between-types = 1
+
+[format]
+quote-style = "single"
