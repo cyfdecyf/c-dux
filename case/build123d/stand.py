@@ -124,6 +124,11 @@ coin_x = 24
 coin_w = 27
 coin_h = 3.4
 coin_depth = 27  # slot depth: fully buries a 25 mm coin lying flat (2 mm play)
+COIN_SLOTS = False  # cut the coin ballast slots? Adds a 27 mm bridge over the
+#    slot ceiling (FDM sags a little, MJF/SLS fine). Off by default: the wide
+#    deep base is usually stable enough on its own; if tip-over testing says
+#    otherwise, flip to True (~170 g of coin ballast) or thicken base_t
+#    (8 -> 12: +~76 g of low-mounted mass, keyboard rises 4 mm).
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 EPS = 0.01
@@ -415,15 +420,16 @@ class Stand:
             base -= Pos(px, py, -EPS) * Cylinder(
                 pad_d / 2, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
-        for sx in (-1, 1):
-            base -= Pos(
-                sx * coin_x - coin_w / 2, self.y1 - coin_depth, base_t / 2 - coin_h / 2
-            ) * Box(
-                coin_w,
-                coin_depth + 1,
-                coin_h,
-                align=(MIN, MIN, MIN),
-            )
+        if COIN_SLOTS:
+            for sx in (-1, 1):
+                base -= Pos(
+                    sx * coin_x - coin_w / 2, self.y1 - coin_depth, base_t / 2 - coin_h / 2
+                ) * Box(
+                    coin_w,
+                    coin_depth + 1,
+                    coin_h,
+                    align=(MIN, MIN, MIN),
+                )
         rad = math.radians(self.tilt)
 
         def wedge(depth: float, height: float):
