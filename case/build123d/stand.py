@@ -69,7 +69,6 @@ from build123d import (
     RectangleRounded,
     RegularPolygon,
     Rot,
-    Text,
     export_step,
     export_stl,
     extrude,
@@ -125,7 +124,6 @@ coin_x = 24
 coin_w = 27
 coin_h = 3.4
 coin_depth = 14
-label_text = 'C.DUX'
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 EPS = 0.01
@@ -473,20 +471,6 @@ class Stand:
             print(f'warning: front junction fillet failed ({exc}) — skipped')
             return body
 
-    def emboss_label(self, part):
-        if not label_text:
-            return part
-        try:
-            # Front face of the base, normal towards the user (-Y). Built as
-            # one Plane — mixing Pos with a Plane composes the offset in the
-            # plane's local frame, which silently misplaces the text.
-            plane = Plane((0, self.y0, 2), x_dir=(1, 0, 0), z_dir=(0, -1, 0))
-            sketch = plane * Text(label_text, font_size=6, align=(Align.CENTER, MIN))
-        except Exception as exc:  # no usable system font — skip, not fatal
-            print(f'warning: label skipped ({exc})')
-            return part
-        return part + extrude(sketch, 0.9)
-
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
@@ -502,7 +486,7 @@ class Stand:
         body = self.fillet_front_junction(body)
         if side == 'right':
             body = mirror(body, about=Plane.YZ)
-        return self.emboss_label(body)
+        return body
 
 
 front_fillet_r = 2.5  # radius on the tension-side (front) junction corner
