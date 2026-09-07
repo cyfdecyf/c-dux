@@ -16,8 +16,9 @@ Things this version does better than the .scad:
   * Demountable two-part design: the base slab is printed ONCE (it is
     symmetric and shared by both sides and every tilt angle); the upright
     (backplate + posts + boot foot) is printed per tilt angle. The joint is
-    two shear keys plus 2x M4x16 socket screws into nut pockets — swapping
-    angles means reprinting only the upright.
+    two shear keys plus 2x M4x12 screws driven up from the open base
+    underside into nuts seated in the boot — swapping angles means
+    reprinting only the upright.
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
   * Multiple mounting sets: the 4-hole pattern is repeated at several
@@ -125,9 +126,8 @@ base_r = 10  # base slab corner radius (plan view)
 # the junction itself is now a demountable joint (constants below).
 haunch_d = 18  # full-width haunch: depth along the seat plane
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
-#               tops out just above the boot, so the 2 joint screws keep
-#               their counterbores on the open boot ledge (the taller
-#               reinforcement is the ribs' job)
+#               tops out just above the boot, keeping the boot ledge around
+#               the nut pockets open (the taller reinforcement is the ribs')
 rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
 #            clear every post of every rotation set AND the joint hardware
 rib_h = 60  # rib height up the back face
@@ -140,10 +140,11 @@ base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 # by every tilt angle and both sides) and a per-angle upright (backplate +
 # posts + boot foot). Every joint feature is laid out in WORLD coordinates on
 # the horizontal seat plane z = base_t, so one base accepts uprights of any
-# tilt. Assembly per side: drop the upright onto the two keys, drive 2x
-# M4x16 socket screws from the boot top through into nut pockets in the base
-# underside. The seat plane carries compression, the keys carry shear and
-# location, the screws carry lift and clamp.
+# tilt. Assembly per side: drop the upright onto the two keys, then drive
+# 2x M4x12 socket screws UP from the open base underside into nut pockets
+# seated in the boot top — screwing down from the boot ledge would put the
+# driver under the reclined plate. The seat plane carries compression, the
+# keys carry shear and location, the screws carry lift and clamp.
 TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
 #             first batch prints the 20° pair only
 joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
@@ -154,19 +155,28 @@ key_h = 3.2  # shallower than its groove (key_h + joint_clear): the boot
 key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
 key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
-boot_h = 6  # boot foot height; its top ledge carries the counterbored heads
+boot_h = 6  # boot foot height; its top ledge hosts the nut pockets
 boot_front = -2  # boot front edge — behind the plate front face at the seat
 boot_rear = 20  # boot rear edge (= rib wedge footprint depth)
 joint_screw_d = 4.5  # M4 clearance through boot + base
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
 joint_screw_y = 14.5
-cbore_d = 8.5  # M4 socket head, sunk flush with the boot top
-cbore_h = 4.0
-joint_screw = 'M4x16'  # informational — printed in the BOM note, not geometry
+# Screw direction: the nuts live in the BOOT, the screws come up from the
+# open base underside. The first draft drove them down from the boot top,
+# but the reclined plate overhangs that ledge (~48 mm up at 20 deg) and
+# leaves no room for a driver; from below the access is unobstructed, and
+# a longer screw costs nothing.
+joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
+head_pocket_d = 8.0  # socket-head pocket in the base underside: the heads
+#                     must sit below the desk face or the base would rock
+head_pocket_h = 4.2
+boot_nut_clear = 1.6  # boot material between its bottom and the nut floor:
+#                      this pocket floor takes the clamp load
 nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
-#                   flats: push the nut in past the flexing lip; it stays
-nut_mouth_h = 1.2
+#                   flats: push the nut in past the flexing lip and it
+#                   stays with the upright
+nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 
 # --- rotation sets -------------------------------------------------------------
 # One post set per angle; the keyboard is re-mounted on the chosen set to
@@ -273,7 +283,7 @@ def joint_keys():
 
 def joint_screw_bores():
     """Vertical M4 clearance holes through the base (pair with
-    joint_nut_pockets on the underside)."""
+    joint_screw_head_pockets on the underside)."""
     bores = None
     for sx in (-1, 1):
         bore = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
@@ -285,19 +295,43 @@ def joint_screw_bores():
     return bores
 
 
-def joint_nut_pockets():
-    """Hex pockets open at the base underside, the mouth pinched just below
-    the nut's across-flats: push the nut in past the flexing lip and it
-    stays put for every future assembly."""
-    hex_r = (nut_af / 2) / math.cos(math.radians(30))
+def joint_screw_head_pockets():
+    """Socket-head pockets open at the base underside: the heads must sit
+    below the desk face or the base would rock on them, and the driver
+    works from the open bottom anyway."""
     pockets = None
     for sx in (-1, 1):
-        pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * (
-            extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h + EPS)
-            + Box(
+        pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
+            head_pocket_d / 2,
+            head_pocket_h + EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        pockets = pocket if pockets is None else pockets + pocket
+    return pockets
+
+
+def joint_nut_pockets():
+    """Boot-side nut seats, one negative per screw: clearance from the boot
+    bottom up to the nut floor, a hex pocket with nut_h (0.2 mm) of
+    headroom, and a pinched mouth at the boot top so the nut snaps in and
+    stays with the upright — each angle's upright can keep its own pair."""
+    hex_r = (nut_af / 2) / math.cos(math.radians(30))
+    floor = boot_nut_clear  # above the boot bottom
+    pockets = None
+    for sx in (-1, 1):
+        pocket = Pos(sx * joint_screw_x, joint_screw_y, base_t - EPS) * (
+            Cylinder(
+                joint_screw_d / 2,
+                floor + 2 * EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+            + Pos(0, 0, floor)
+            * extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h)
+            + Pos(0, 0, floor + nut_h)
+            * Box(
                 nut_mouth_w,
                 nut_mouth_w,
-                nut_mouth_h + EPS,
+                boot_h - floor - nut_h + EPS,
                 align=(Align.CENTER, Align.CENTER, MIN),
             )
         )
@@ -324,31 +358,9 @@ def joint_grooves():
     return grooves
 
 
-def joint_screw_heads():
-    """Boot-side screw features: clearance through the boot plus a
-    counterbore so an M4 socket head sits flush with the boot top."""
-    holes = None
-    for sx in (-1, 1):
-        hole = Pos(sx * joint_screw_x, joint_screw_y, base_t) * (
-            Cylinder(
-                joint_screw_d / 2,
-                boot_h + EPS,
-                align=(Align.CENTER, Align.CENTER, MIN),
-            )
-            + Pos(0, 0, boot_h - cbore_h)
-            * Cylinder(
-                cbore_d / 2,
-                cbore_h + EPS,
-                align=(Align.CENTER, Align.CENTER, MIN),
-            )
-        )
-        holes = hole if holes is None else holes + hole
-    return holes
-
-
 def joint_coupons():
     """Pair of mating fit-test coupons — a base fragment (key + screw bore +
-    nut pocket) and a boot fragment (groove + counterbore) — printed flat
+    head pocket) and a boot fragment (groove + nut seat) — printed flat
     before committing to full parts: the 0.4 mm clearance and the nut lip
     are the two things worth checking on your machine first. Both lie on
     the bed, 40 mm apart."""
@@ -357,11 +369,11 @@ def joint_coupons():
         2 * (joint_screw_x + 12), frag_y1 - frag_y0, base_t
     )
     base_c += joint_keys()
-    base_c -= joint_screw_bores() + joint_nut_pockets()
+    base_c -= joint_screw_bores() + joint_screw_head_pockets()
     boot_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t + boot_h / 2) * Box(
         2 * (joint_screw_x + 12), frag_y1 - frag_y0, boot_h
     )
-    boot_c -= joint_grooves() + joint_screw_heads()
+    boot_c -= joint_grooves() + joint_nut_pockets()
     # drop the boot fragment onto the bed next to the base fragment
     return base_c + Pos(0, frag_y1 - frag_y0 + 40, -base_t) * boot_c
 
@@ -503,7 +515,7 @@ class Stand:
             x = lo + 2 * i
             if abs(x) < key_x + key_l / 2 + rib_t / 2 + 1:
                 continue
-            if abs(abs(x) - joint_screw_x) < cbore_d / 2 + rib_t / 2 + 1:
+            if abs(abs(x) - joint_screw_x) < nut_pocket_ac / 2 + rib_t / 2 + 1:
                 continue
             if all(abs(x - px) >= 12 for px, _ in zone):
                 cand.append(x)
@@ -584,7 +596,7 @@ class Stand:
                 pad_d / 2, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
         base += joint_keys()
-        base -= joint_screw_bores() + joint_nut_pockets()
+        base -= joint_screw_bores() + joint_screw_head_pockets()
         return base
 
     # -- upright: backplate + posts + boot foot, one part per tilt angle ------
@@ -613,7 +625,7 @@ class Stand:
             )
         body += boot
         body -= joint_grooves()
-        body -= joint_screw_heads()
+        body -= joint_nut_pockets()
         # Trims the bottom post flares, which dip below the seat plane at
         # low tilt angles (nothing else lives down there).
         body -= Pos(0, 0, base_t - 25) * Box(400, 400, 50)
@@ -776,7 +788,8 @@ def main() -> None:
         print(
             f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
             f'  | haunch_h = {stand.haunch_h:.1f} mm'
-            f'  | joint: keys x=±{key_x:g}, screws x=±{joint_screw_x:g} ({joint_screw})'
+            f'  | joint: keys x=±{key_x:g}, screws x=±{joint_screw_x:g} '
+            f'({joint_screw} from below)'
         )
         emit(stand.build(args.part, args.side), stem)
 
