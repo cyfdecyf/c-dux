@@ -13,8 +13,13 @@ Things this version does better than the .scad:
     table and refuses to run if anything moved.
   * B-rep fillets: the base slab gets a rounded top perimeter, which CSG
     mesh tools cannot do.
-  * Reinforced base-plate junction for vertical typing loads: full-width
-    haunch, back-face ribs, deeper embed, front tension-corner fillet.
+  * Demountable two-part design: the base slab is printed ONCE (it is
+    symmetric and shared by both sides and every tilt angle); the upright
+    (backplate + posts + boot foot) is printed per tilt angle. The joint is
+    two shear keys plus 2x M4x16 socket screws into nut pockets — swapping
+    angles means reprinting only the upright.
+  * Junction reinforcement survives the split: the full-width haunch and
+    the back-face ribs moved onto the upright's boot.
   * Multiple mounting sets: the 4-hole pattern is repeated at several
     in-plane rotation angles, so the keyboard (and with it the home row)
     can be re-mounted at a different tilt.
@@ -41,9 +46,13 @@ The sets therefore staircase slightly upward with increasing angle.
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
-    uv run stand.py                          # left half, full (tilt fixed 20°)
-    uv run stand.py --side right
-    uv run stand.py --part fit               # flat validation plate + posts
+    uv run stand.py --part base              # shared base slab (print once)
+    uv run stand.py --part upright           # left upright, 20 deg recline
+    uv run stand.py --side right --part upright
+    uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
+    uv run stand.py --part full              # fused assembly preview
+    uv run stand.py --part joint             # small fit-test coupons
+    uv run stand.py --part fit               # legacy flat validation plate
     uv run stand.py --set-angles 10,20,30    # custom rotation sets
 """
 
@@ -69,6 +78,7 @@ from build123d import (
     RectangleRounded,
     RegularPolygon,
     Rot,
+    chamfer,
     export_step,
     export_stl,
     extrude,
@@ -106,41 +116,63 @@ nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
 tap_d = 3.4
-base_t = 8  # lower base top = lower keyboard; 8 keeps 2.3 mm walls around the coin slots
+base_t = 8  # the seat plane: base top = upright's boot bottom
 base_front = 40  # deeper towards the user: support polygon under the hands
-base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm,
-#                 houses the 27 mm coin slots fully (if COIN_SLOTS is enabled)
+base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
 base_side = 24  # wider stance against lateral rocking while typing
 base_r = 10  # base slab corner radius (plan view)
-# Junction reinforcement — vertical typing hammers the base-plate junction;
-# the scad version only has the small embed + 3 gussets for this.
-haunch_d = 18  # full-width haunch: depth along the base top
-haunch_h = 25  # haunch height up the plate back face (auto-capped if a post
-#               set places a low hole over the ridge)
+# Junction reinforcement — vertical typing hammers the base-upright junction;
+# the junction itself is now a demountable joint (constants below).
+haunch_d = 18  # full-width haunch: depth along the seat plane
+haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
+#               tops out just above the boot, so the 2 joint screws keep
+#               their counterbores on the open boot ledge (the taller
+#               reinforcement is the ribs' job)
 rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
-#            clear every post of every rotation set
+#            clear every post of every rotation set AND the joint hardware
+rib_h = 60  # rib height up the back face
 pad_d = 20
 pad_recess = 0.8
-coin_x = 24
-coin_w = 27
-coin_h = 3.4
-coin_depth = 27  # slot depth: fully buries a 25 mm coin lying flat (2 mm play)
-COIN_SLOTS = False  # cut the coin ballast slots? Adds a 27 mm bridge over the
-#    slot ceiling (FDM sags a little, MJF/SLS fine). Off by default: the wide
-#    deep base is usually stable enough on its own; if tip-over testing says
-#    otherwise, flip to True (~170 g of coin ballast) or thicken base_t
-#    (8 -> 12: +~76 g of low-mounted mass, keyboard rises 4 mm).
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
-EPS = 0.01
-EMBED = 4.0  # how deep the plate sinks into the base top (deeper = stronger junction)
+# --- base ↔ upright joint -------------------------------------------------------
+# The stand ships as two printed parts: the base slab (printed once — shared
+# by every tilt angle and both sides) and a per-angle upright (backplate +
+# posts + boot foot). Every joint feature is laid out in WORLD coordinates on
+# the horizontal seat plane z = base_t, so one base accepts uprights of any
+# tilt. Assembly per side: drop the upright onto the two keys, drive 2x
+# M4x16 socket screws from the boot top through into nut pockets in the base
+# underside. The seat plane carries compression, the keys carry shear and
+# location, the screws carry lift and clamp.
+TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
+#             first batch prints the 20° pair only
+joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
+key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
+key_w = 8
+key_h = 3.2  # shallower than its groove (key_h + joint_clear): the boot
+#             seats on the base top plane, never bottoming out on the keys
+key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
+key_y0, key_y1 = 12, 20
+key_chamfer = 0.5  # 45° lead-in on the key top edges
+boot_h = 6  # boot foot height; its top ledge carries the counterbored heads
+boot_front = -2  # boot front edge — behind the plate front face at the seat
+boot_rear = 20  # boot rear edge (= rib wedge footprint depth)
+joint_screw_d = 4.5  # M4 clearance through boot + base
+joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
+#                    clear the keys and the ribs (see the rib keep-outs)
+joint_screw_y = 14.5
+cbore_d = 8.5  # M4 socket head, sunk flush with the boot top
+cbore_h = 4.0
+joint_screw = 'M4x16'  # informational — printed in the BOM note, not geometry
+nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
+#                   flats: push the nut in past the flexing lip; it stays
+nut_mouth_h = 1.2
 
 # --- rotation sets -------------------------------------------------------------
 # One post set per angle; the keyboard is re-mounted on the chosen set to
 # tilt the home row. Angles are CCW in the front view — negate the list to
 # mirror the tilt direction. See the module docstring for why 5-deg steps
 # are impossible.
-TILT = 20.0  # stand recline from vertical, deg — fixed by design
 SET_ANGLES = [10, 20, 30]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
@@ -219,6 +251,122 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
 
 
 # ---------------------------------------------------------------------------
+# Joint geometry — world frame, defined once so the base accepts uprights of
+# any tilt (and so the --part joint coupons reuse the exact production
+# features instead of a lookalike)
+# ---------------------------------------------------------------------------
+
+
+def joint_keys():
+    """Two shear keys standing on the seat plane. They locate the upright in
+    X/Y/yaw and carry the horizontal typing loads; the seat plane carries
+    compression, the screws carry lift and clamp."""
+    keys = None
+    for sx in (-1, 1):
+        key = Pos(sx * key_x - key_l / 2, key_y0, base_t) * Box(
+            key_l, key_w, key_h, align=(MIN, MIN, MIN)
+        )
+        keys = key if keys is None else keys + key
+    # 45° lead-in all around the top so the boot grooves drop on cleanly
+    return chamfer(keys.edges().group_by(Axis.Z)[-1], key_chamfer)
+
+
+def joint_screw_bores():
+    """Vertical M4 clearance holes through the base (pair with
+    joint_nut_pockets on the underside)."""
+    bores = None
+    for sx in (-1, 1):
+        bore = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
+            joint_screw_d / 2,
+            base_t + 2 * EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        bores = bore if bores is None else bores + bore
+    return bores
+
+
+def joint_nut_pockets():
+    """Hex pockets open at the base underside, the mouth pinched just below
+    the nut's across-flats: push the nut in past the flexing lip and it
+    stays put for every future assembly."""
+    hex_r = (nut_af / 2) / math.cos(math.radians(30))
+    pockets = None
+    for sx in (-1, 1):
+        pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * (
+            extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h + EPS)
+            + Box(
+                nut_mouth_w,
+                nut_mouth_w,
+                nut_mouth_h + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+        )
+        pockets = pocket if pockets is None else pockets + pocket
+    return pockets
+
+
+def joint_grooves():
+    """Matching pockets in the boot underside, joint_clear deeper than the
+    keys are tall so the boot seats on the base top, not on the keys."""
+    grooves = None
+    for sx in (-1, 1):
+        groove = Pos(
+            sx * key_x - key_l / 2 - joint_clear,
+            key_y0 - joint_clear,
+            base_t,
+        ) * Box(
+            key_l + 2 * joint_clear,
+            key_w + 2 * joint_clear,
+            key_h + joint_clear,
+            align=(MIN, MIN, MIN),
+        )
+        grooves = groove if grooves is None else grooves + groove
+    return grooves
+
+
+def joint_screw_heads():
+    """Boot-side screw features: clearance through the boot plus a
+    counterbore so an M4 socket head sits flush with the boot top."""
+    holes = None
+    for sx in (-1, 1):
+        hole = Pos(sx * joint_screw_x, joint_screw_y, base_t) * (
+            Cylinder(
+                joint_screw_d / 2,
+                boot_h + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+            + Pos(0, 0, boot_h - cbore_h)
+            * Cylinder(
+                cbore_d / 2,
+                cbore_h + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+        )
+        holes = hole if holes is None else holes + hole
+    return holes
+
+
+def joint_coupons():
+    """Pair of mating fit-test coupons — a base fragment (key + screw bore +
+    nut pocket) and a boot fragment (groove + counterbore) — printed flat
+    before committing to full parts: the 0.4 mm clearance and the nut lip
+    are the two things worth checking on your machine first. Both lie on
+    the bed, 40 mm apart."""
+    frag_y0, frag_y1 = key_y0 - 18, key_y1 + 6
+    base_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t / 2) * Box(
+        2 * (joint_screw_x + 12), frag_y1 - frag_y0, base_t
+    )
+    base_c += joint_keys()
+    base_c -= joint_screw_bores() + joint_nut_pockets()
+    boot_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t + boot_h / 2) * Box(
+        2 * (joint_screw_x + 12), frag_y1 - frag_y0, boot_h
+    )
+    boot_c -= joint_grooves() + joint_screw_heads()
+    # drop the boot fragment onto the bed next to the base fragment
+    return base_c + Pos(0, frag_y1 - frag_y0 + 40, -base_t) * boot_c
+
+
+# ---------------------------------------------------------------------------
 # Geometry
 # ---------------------------------------------------------------------------
 
@@ -232,18 +380,20 @@ class Stand:
         post_h: float,
         attach: str,
         set_angles: list[float],
+        tilt: float = TILT,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
-        self.tilt = TILT
+        self.tilt = tilt
         self.post_h = post_h
         self.attach = attach
 
-        self.origin_z = base_t - EMBED
+        self.origin_z = base_t  # the plate rests on the seat plane; the boot
+        #                         foot + keys + joint screws carry the junction
         self.plate_h = bottom_ext + pcb_h + top_ext
         self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
-        self.ct, self.st = math.cos(math.radians(TILT)), math.sin(math.radians(TILT))
+        self.ct, self.st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
@@ -254,6 +404,12 @@ class Stand:
             print(
                 f'warning: rotation sets need plate half-width {self.plate_half:.1f} '
                 f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
+            )
+        if self.plate_half < joint_screw_x + 5:
+            sys.exit(
+                f'error: joint screws at |x|={joint_screw_x:g} need plate half-width '
+                f'>= {joint_screw_x + 5:g}, got {self.plate_half:.1f} — reduce the '
+                '--set-angles spread'
             )
         self.rib_x = self._auto_ribs()
         if len(self.rib_x) < 3:
@@ -336,13 +492,19 @@ class Stand:
 
     def _auto_ribs(self) -> list[float]:
         """Rib x positions: farthest-point sampling over the x candidates that
-        keep >= 12 mm sideways to every post passing through the rib band."""
-        band_lo, band_hi = 3 - 6, 63.4 + 6  # rib band incl. post radius
+        keep >= 12 mm sideways to every post passing through the rib band and
+        clear of the joint hardware crossing the boot bottom (keys at
+        |x| <= key_x + key_l/2, screw counterbores around joint_screw_x)."""
+        band_lo, band_hi = 3 - 6, rib_h + 6  # rib band incl. post radius
         zone = [(x, y) for x, y in self.all_posts if band_lo <= y <= band_hi]
         lo, hi = -(self.plate_half - 12), self.plate_half - 12
         cand = []
         for i in range(int((hi - lo) / 2) + 1):
             x = lo + 2 * i
+            if abs(x) < key_x + key_l / 2 + rib_t / 2 + 1:
+                continue
+            if abs(abs(x) - joint_screw_x) < cbore_d / 2 + rib_t / 2 + 1:
+                continue
             if all(abs(x - px) >= 12 for px, _ in zone):
                 cand.append(x)
         if not cand:
@@ -421,83 +583,70 @@ class Stand:
             base -= Pos(px, py, -EPS) * Cylinder(
                 pad_d / 2, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
-        if COIN_SLOTS:
-            for sx in (-1, 1):
-                base -= Pos(
-                    sx * coin_x - coin_w / 2, self.y1 - coin_depth, base_t / 2 - coin_h / 2
-                ) * Box(
-                    coin_w,
-                    coin_depth + 1,
-                    coin_h,
-                    align=(MIN, MIN, MIN),
-                )
+        base += joint_keys()
+        base -= joint_screw_bores() + joint_nut_pockets()
+        return base
+
+    # -- upright: backplate + posts + boot foot, one part per tilt angle ------
+
+    def upright_solid(self):
+        """The demountable half: everything above the seat plane, printed
+        boot-down on the bed, support-free like the old one-piece print."""
         rad = math.radians(self.tilt)
-
-        def wedge(depth: float, height: float):
-            # Profile in the YZ plane: base along the base top, apex up the
-            # tilted backplate's back face; anchor edges sit inside the
-            # solids so the union fuses cleanly, and every face is
-            # support-free as printed.
-            return Polygon(
-                (0, 0),
-                (depth, 0),
-                (height * math.sin(rad), height * math.cos(rad)),
-                align=None,
-            )
-
-        # Full-width (= plate width) haunch: fills the junction inner corner
-        # so typing loads bend a shallow ramp instead of prying open a
-        # knife-edge corner. Kept flush with the plate sides — wider than
-        # that, the haunch apex would stand exposed as a fragile fin.
-        base += Pos(-self.plate_w / 2, -2, base_t - 1) * extrude(
-            Plane.YZ * wedge(haunch_d, self.haunch_h), self.plate_w
+        body = (
+            Pos(0, 0, self.origin_z)
+            * Rot(X=90 - self.tilt)
+            * self.plate_and_posts()
+        )
+        boot = Pos(0, (boot_front + boot_rear) / 2, base_t + boot_h / 2) * Box(
+            self.plate_w, boot_rear - boot_front, boot_h
+        )
+        # Full-width haunch: a shallow ramp up the back face that tops out
+        # just above the boot (haunch_h), filling the junction inner corner.
+        boot += Pos(-self.plate_w / 2, boot_front, base_t) * extrude(
+            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), self.plate_w
         )
         # Ribs continue up the back face into the hammering zone.
         for rx in self.rib_x:
-            base += Pos(rx - rib_t / 2, -2, base_t - 1) * extrude(
-                Plane.YZ * wedge(rib_t + 14, 60), rib_t
+            boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
+                Plane.YZ * self._wedge(rib_t + 14, rib_h, rad), rib_t
             )
-        return base
+        body += boot
+        body -= joint_grooves()
+        body -= joint_screw_heads()
+        # Trims the bottom post flares, which dip below the seat plane at
+        # low tilt angles (nothing else lives down there).
+        body -= Pos(0, 0, base_t - 25) * Box(400, 400, 50)
+        return body
 
-    def fillet_front_junction(self, body):
-        """Round the concave edge where the plate front face meets the base
-        top. Typing pries the plate forward, so this tension-side corner
-        should not stay a knife edge."""
-        edges = [
-            e
-            for e in body.edges().filter_by(Axis.X)
-            if abs(e.center().Z - base_t) < 0.2
-            and -7 < e.center().Y < -1
-            and e.length > 50  # skip slivers beside the plate's rounded corners
-        ]
-        if not edges:
-            print('warning: front junction edge not found — fillet skipped')
-            return body
-        try:
-            return fillet(edges, front_fillet_r)
-        except Exception as exc:
-            print(f'warning: front junction fillet failed ({exc}) — skipped')
-            return body
+    def _wedge(self, depth: float, height: float, rad: float):
+        # Profile in the YZ plane: base along the seat plane, apex up the
+        # tilted backplate's back face; anchor edges sit inside the
+        # solids so the union fuses cleanly, and every face is
+        # support-free as printed.
+        return Polygon(
+            (0, 0),
+            (depth, 0),
+            (height * math.sin(rad), height * math.cos(rad)),
+            align=None,
+        )
 
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
+        if part == 'base':
+            return self.base_solid()
         if part == 'fit':
             body = self.plate_and_posts()
             return mirror(body, about=Plane.YZ) if side == 'right' else body
-        body = (
-            self.base_solid()
-            + Pos(0, 0, self.origin_z)
-            * Rot(X=90 - self.tilt)
-            * self.plate_and_posts()
-        )
-        body = self.fillet_front_junction(body)
-        if side == 'right':
-            body = mirror(body, about=Plane.YZ)
-        return body
-
-
-front_fillet_r = 2.5  # radius on the tension-side (front) junction corner
+        if part == 'upright':
+            body = self.upright_solid()
+            return mirror(body, about=Plane.YZ) if side == 'right' else body
+        if part == 'joint':
+            return joint_coupons()
+        # 'full': fused assembly preview of the two parts
+        body = self.base_solid() + self.upright_solid()
+        return mirror(body, about=Plane.YZ) if side == 'right' else body
 
 
 def summary(name: str, part) -> None:
@@ -531,9 +680,17 @@ def main() -> None:
     ap.add_argument('--side', choices=['left', 'right'], default='left')
     ap.add_argument(
         '--part',
-        choices=['full', 'fit'],
+        choices=['base', 'upright', 'full', 'fit', 'joint'],
         default='full',
-        help="'fit' = flat validation plate + posts only",
+        help="'base' = shared slab (print once) | 'upright' = per-tilt part | "
+        "'full' = fused preview | 'fit' = flat validation plate | "
+        "'joint' = fit-test coupons",
+    )
+    ap.add_argument(
+        '--tilt',
+        type=str,
+        default=f'{TILT:g}',
+        help='comma-separated stand recline angles (deg) for upright/full',
     )
     ap.add_argument(
         '--post-h', type=float, default=5, help='post height = PCB-to-plate gap'
@@ -567,27 +724,61 @@ def main() -> None:
     set_angles = [float(a) for a in args.set_angles.split(',')]
     if len(set_angles) < 1:
         sys.exit('error: --set-angles needs at least one angle')
+    tilts = [float(a) for a in args.tilt.split(',')]
+    if len(tilts) < 1:
+        sys.exit('error: --tilt needs at least one angle')
 
     pcb_w, pcb_h, holes = parse_pcb(args.pcb)
-    stand = Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles)
-
-    for (ang, pts), (_, _, _, corner_z) in zip(stand.sets, stand.set_meta):
-        print(f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
-              f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm')
-    print(f'ribs at x = {[round(x, 1) for x in stand.rib_x]}  | haunch_h = {stand.haunch_h:.1f} mm')
-
-    part = stand.build(args.part, args.side)
-    stem = f'stand_{args.side}_{args.part}'
-    summary(stem, part)
-    if args.show:
-        push_viewer(part, stem)
-        return
     args.out.mkdir(parents=True, exist_ok=True)
-    stl, step = args.out / f'{stem}.stl', args.out / f'{stem}.step'
-    export_stl(part, stl)
-    export_step(part, step)
-    print(f'exported: {stl}\n          {step}')
-    push_viewer(part, stem)
+
+    def emit(part, stem: str) -> None:
+        summary(stem, part)
+        if args.show:
+            push_viewer(part, stem)
+            return
+        stl, step = args.out / f'{stem}.stl', args.out / f'{stem}.step'
+        export_stl(part, stl)
+        export_step(part, step)
+        print(f'exported: {stl}\n          {step}')
+        push_viewer(part, stem)
+
+    if args.part == 'joint':
+        emit(joint_coupons(), 'joint_coupons')
+        return
+
+    # The base is tilt- and side-independent: one Stand, one export.
+    if args.part == 'base':
+        stands = [Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles)]
+        stems = ['stand_base']
+    else:
+        # 'fit' geometry does not vary with the tilt; only build it once.
+        if args.part == 'fit':
+            tilts = tilts[:1]
+        stands, stems = [], []
+        for tilt in tilts:
+            stands.append(
+                Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles, tilt)
+            )
+            tag = f'_t{tilt:g}'
+            if args.part == 'upright':
+                stems.append(f'stand_{args.side}_upright{tag}')
+            elif args.part == 'full':
+                stems.append(f'stand_{args.side}_full{tag}')
+            else:
+                stems.append(f'stand_{args.side}_fit')
+
+    for stand, stem in zip(stands, stems, strict=True):
+        for (ang, pts), (_, _, _, corner_z) in zip(stand.sets, stand.set_meta):
+            print(
+                f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
+                f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm'
+            )
+        print(
+            f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
+            f'  | haunch_h = {stand.haunch_h:.1f} mm'
+            f'  | joint: keys x=±{key_x:g}, screws x=±{joint_screw_x:g} ({joint_screw})'
+        )
+        emit(stand.build(args.part, args.side), stem)
 
 
 if __name__ == '__main__':
