@@ -121,7 +121,9 @@ tap_d = 3.4
 base_t = 8  # the seat plane: base top = upright's boot bottom
 base_front = 40  # deeper towards the user: support polygon under the hands
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
-base_side = 24  # wider stance against lateral rocking while typing
+base_side = 16  # lateral margin past the PCB: 16 puts the base (144.5 mm)
+#                flush with the upright (plate 144 wide) instead of wider —
+#                material cost; the lateral stance rides on the pad spread
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -413,7 +415,7 @@ class Stand:
         # plate must cover every post with room for the 6 mm radius + margin
         self.plate_half = max(pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + 8)
         self.plate_w = 2 * self.plate_half
-        if self.plate_half > self.bx / 2 - 0.5:
+        if self.plate_half > self.bx / 2:
             print(
                 f'warning: rotation sets need plate half-width {self.plate_half:.1f} '
                 f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
