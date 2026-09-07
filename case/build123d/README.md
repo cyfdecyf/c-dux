@@ -4,7 +4,8 @@
 [`case/scad/stand.scad`](../scad/stand.scad)(OpenSCAD 版)是同一设计,
 参数同名同默认。区别:
 
-- 同时导出 **STL + STEP** —— STEP 是嘉立创等代打服务的首选格式
+- 默认导出 **STL**(切片用),`--step` 加导 STEP —— STEP 是嘉立创等
+  代打服务的首选格式
   (精确 B-rep,非网格近似);
 - B-rep 圆角:底座顶面周边 2 mm 圆角(OpenSCAD 做不到);
 - **两件式**:底座与立板(背板+柱+靴座)拆成两个零件,榫键 + 2×M4 螺丝
@@ -63,7 +64,8 @@ uv run stand.py --set-angles 10,20,30      # 自定义平面内旋转组
 
 输出到 `out/`:`stand_base.*`(底座,不分左右)、
 `stand_<side>_upright_t<角度>.*`(立板)、`stand_<side>_full_t<角度>.*`
-(装配预览)、`joint_coupons.*`(试块)。每个变体同时输出 STL + STEP,
+(装配预览)、`joint_coupons.*`(试块)。默认只导出 STL(切片用),加
+`--step` 同时导出 STEP——代打服务的首选格式(精确 B-rep,非网格近似)。
 终端打印包围盒、体积与估重(实心体积;FDM 有填充时实际更轻)。默认行为 =
 **导出文件 + 顺带推送预览**:VS Code 里开着 OCP CAD Viewer 就会实时显示,
 没开则打印一行提示、照常导出——文件产出不依赖查看器。
@@ -144,7 +146,7 @@ uv run stand.py --set-angles 10,20,30      # 自定义平面内旋转组
 
 ## 嘉立创代打
 
-- **上传 `.step`**(优先)或 `.stl`,都在 `out/` 里。
+- **上传 `.step`**(优先)或 `.stl`(`--step` 导出),都在 `out/` 里。
 - **工艺建议**:首版验证件怎么便宜怎么来(FDM PETG/PLA);长期使用和
   将来的 v2 可调机构建议 PA12(MJF/SLS)——免支撑、强度好、耐蠕变,
   摩擦特性也适合铰链。

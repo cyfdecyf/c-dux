@@ -2,9 +2,9 @@
 """C. Dux — vertical (dodo-style) stand, build123d implementation.
 
 Same design and parameters as case/scad/stand.scad (see that README for the
-posture / mounting / stability rationale), exported as STL (slicing) plus
-STEP, the preferred format for outsourced 3D printing (JLCPCB takes exact
-B-rep instead of faceted meshes).
+posture / mounting / stability rationale). The default export is STL for
+slicing; pass --step to also write STEP, the preferred format for outsourced
+3D printing (JLCPCB takes exact B-rep instead of faceted meshes).
 
 Things this version does better than the .scad:
   * All PCB data (M4 hole positions, board outline) is parsed directly from
@@ -55,6 +55,7 @@ Usage:
     uv run stand.py --part joint             # small fit-test coupons
     uv run stand.py --part fit               # legacy flat validation plate
     uv run stand.py --set-angles 10,20,30    # custom rotation sets
+    uv run stand.py --part base --step       # also export STEP for outsourcing
 """
 
 from __future__ import annotations
@@ -721,6 +722,11 @@ def main() -> None:
     )
     ap.add_argument('--out', type=Path, default=Path(__file__).parent / 'out')
     ap.add_argument(
+        '--step',
+        action='store_true',
+        help='also export STEP (exact B-rep, for outsourced 3D printing)',
+    )
+    ap.add_argument(
         '--show',
         action='store_true',
         help='push to the OCP CAD Viewer instead of exporting',
@@ -748,10 +754,13 @@ def main() -> None:
         if args.show:
             push_viewer(part, stem)
             return
-        stl, step = args.out / f'{stem}.stl', args.out / f'{stem}.step'
+        stl = args.out / f'{stem}.stl'
         export_stl(part, stl)
-        export_step(part, step)
-        print(f'exported: {stl}\n          {step}')
+        print(f'exported: {stl}')
+        if args.step:
+            step = args.out / f'{stem}.step'
+            export_step(part, step)
+            print(f'          {step}')
         push_viewer(part, stem)
 
     if args.part == 'joint':
