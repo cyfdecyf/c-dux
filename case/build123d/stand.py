@@ -374,24 +374,31 @@ def joint_grooves():
     return grooves
 
 
-def joint_coupons():
-    """Pair of mating fit-test coupons — a base fragment (key + screw bore +
-    head pocket) and a boot fragment (groove + nut seat) — printed flat
-    before committing to full parts: the 0.4 mm clearance and the nut lip
-    are the two things worth checking on your machine first. Both lie on
-    the bed, 40 mm apart."""
+def _coupon_box(z0: float, height: float):
+    """Common footprint for the two joint-coupon fragments: wide enough to
+    hold a key and a screw position at their production spacing."""
     frag_y0, frag_y1 = key_y0 - 18, key_y1 + 6
-    base_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t / 2) * Box(
-        2 * (joint_screw_x + 12), frag_y1 - frag_y0, base_t
+    return Pos(0, (frag_y0 + frag_y1) / 2, z0 + height / 2) * Box(
+        2 * (joint_screw_x + 12), frag_y1 - frag_y0, height
     )
-    base_c += joint_keys()
-    base_c -= joint_screw_bores() + joint_screw_head_pockets()
-    boot_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t + boot_h / 2) * Box(
-        2 * (joint_screw_x + 12), frag_y1 - frag_y0, boot_h
-    )
-    boot_c -= joint_grooves() + joint_nut_pockets()
-    # drop the boot fragment onto the bed next to the base fragment
-    return base_c + Pos(0, frag_y1 - frag_y0 + 40, -base_t) * boot_c
+
+
+def joint_coupon_base():
+    """Fit-test coupon, base side: key + screw bore + head pocket, printed
+    flat. Checks the 0.4 mm key clearance and the head-pocket depth."""
+    c = _coupon_box(0, base_t)
+    c += joint_keys()
+    c -= joint_screw_bores() + joint_screw_head_pockets()
+    return c
+
+
+def joint_coupon_boot():
+    """Fit-test coupon, boot side: groove + nut seat (floor, hex pocket,
+    pinched mouth), printed flat on what would be the seat plane. Checks
+    the groove fit and whether the nut snaps past the lip and stays."""
+    c = _coupon_box(base_t, boot_h)
+    c -= joint_grooves() + joint_nut_pockets()
+    return Pos(0, 0, -base_t) * c  # onto the bed
 
 
 # ---------------------------------------------------------------------------
@@ -683,8 +690,6 @@ class Stand:
         if part == 'upright':
             body = self.upright_solid()
             return mirror(body, about=Plane.YZ) if side == 'right' else body
-        if part == 'joint':
-            return joint_coupons()
         # 'full': fused assembly preview of the two parts
         body = self.base_solid() + self.upright_solid()
         return mirror(body, about=Plane.YZ) if side == 'right' else body
@@ -792,7 +797,8 @@ def main() -> None:
         push_viewer(part, stem)
 
     if args.part == 'joint':
-        emit(joint_coupons(), 'joint_coupons')
+        emit(joint_coupon_base(), 'joint_coupon_base')
+        emit(joint_coupon_boot(), 'joint_coupon_boot')
         return
 
     # The base is tilt- and side-independent: one Stand, one export.

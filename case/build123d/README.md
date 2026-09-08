@@ -74,7 +74,8 @@ uv run stand.py --set-angles 20            # 安装组平面内旋转角(默认 
 
 输出到 `out/`:`stand_base.*`(底座,不分左右)、
 `stand_<side>_upright_t<角度>.*`(立板)、`stand_<side>_full_t<角度>.*`
-(装配预览)、`joint_coupons.*`(试块)。默认只导出 STL(切片用),加
+(装配预览)、`joint_coupon_base.*` / `joint_coupon_boot.*`(配合
+试块,两个独立文件,各自平放即打印姿态)。默认只导出 STL(切片用),加
 `--step` 同时导出 STEP——代打服务的首选格式(精确 B-rep,非网格近似)。
 终端打印包围盒、体积与估重(实心体积;FDM 有填充时实际更轻)。默认行为 =
 **导出文件 + 顺带推送预览**:VS Code 里开着 OCP CAD Viewer 就会实时显示,
