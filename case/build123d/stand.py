@@ -104,8 +104,8 @@ SIZE_TOL = 0.5
 # --- geometry parameters (also see README) ------------------------------------
 plate_t = 6
 plate_margin = 10
-bottom_ext = 6.5  # plate below the PCB bottom edge; with base_t=8 the tilt=0
-#                  posture clears the base top by 2.5 mm (the tightest case)
+bottom_ext = 6.5  # plate below the PCB bottom edge; the solver's v_floor
+#                  keeps the board's lowest corner clear of the base top
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -115,10 +115,11 @@ nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
 tap_d = 3.4
-base_t = 8  # the seat plane: base top = upright's boot bottom
-base_front = 32  # depth towards the user: forward-tip (pull/bump) margin only;
-#                  deliberately the smaller half — the recurring typing load
-#                  tips the stand REARWARD, that margin lives in base_rear
+base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
+#            for walls around the (since deleted) coin slots; 6 is plenty
+#            for a flat slab and drops the keyboard 2 mm
+base_front = 30  # apron towards the user, trimmed for cost: typing loads
+#                 lean on the rear lever arm, the front pads carry little
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
 base_side = 10  # lateral margin past the PCB: 10 makes the base (132.5 mm)
 #                exactly flush with the upright (plate 132.5 wide); the old 16
