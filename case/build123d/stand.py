@@ -163,9 +163,12 @@ key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
 key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
 key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
-boot_h = 6  # boot foot height; its top ledge hosts the nut pockets
+boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
+#            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = -2  # boot front edge — behind the plate front face at the seat
-boot_rear = 20  # boot rear edge (= rib wedge footprint depth)
+boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
+#                nut seats get a ~7 mm wall behind them instead of 1.2, and
+#                the wider seat patch adds compression area to the joint
 joint_screw_d = 4.5  # M4 clearance through boot + base
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
@@ -179,8 +182,9 @@ joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
 head_pocket_d = 8.0  # socket-head pocket in the base underside: the heads
 #                     must sit below the desk face or the base would rock
 head_pocket_h = 4.2
-boot_nut_clear = 1.6  # boot material between its bottom and the nut floor:
-#                      this pocket floor takes the clamp load
+boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
+#                      this pocket floor takes the clamp load — keep it
+#                      chunky, plastic creeps under a sustained bolt load
 nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
 #                   flats: push the nut in past the flexing lip and it
 #                   stays with the upright
