@@ -153,8 +153,8 @@ TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
 joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
-key_h = 3.2  # shallower than its groove (key_h + joint_clear): the boot
-#             seats on the base top plane, never bottoming out on the keys
+key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
+#             top plane, never bottoming out on the keys
 key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
 key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
@@ -343,18 +343,22 @@ def joint_nut_pockets():
 
 
 def joint_grooves():
-    """Matching pockets in the boot underside, joint_clear deeper than the
-    keys are tall so the boot seats on the base top, not on the keys."""
+    """Key pockets in the boot underside, cut all the way through. The
+    joint_clear margin over the keys keeps the boot seated on the base top
+    plane, not on the keys; within key height the pocket walls are the shear
+    path either way, and the seat-plane bearing footprint is unchanged. The
+    open window also prints clean boot-down — the old blind-pocket roof was
+    a one-side-anchored 8.8 mm bridge for zero structural return."""
     grooves = None
     for sx in (-1, 1):
         groove = Pos(
             sx * key_x - key_l / 2 - joint_clear,
             key_y0 - joint_clear,
-            base_t,
+            base_t - EPS,
         ) * Box(
             key_l + 2 * joint_clear,
             key_w + 2 * joint_clear,
-            key_h + joint_clear,
+            boot_h + 2 * EPS,
             align=(MIN, MIN, MIN),
         )
         grooves = groove if grooves is None else grooves + groove
