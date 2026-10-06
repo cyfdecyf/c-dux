@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """C. Dux — vertical (dodo-style) stand, build123d implementation.
 
-Same design and parameters as case/scad/stand.scad (see that README for the
-posture / mounting / stability rationale). The default export is STL for
+See README.md (same directory) for the posture / mounting / stability
+rationale. The default export is STL for
 slicing; pass --step to also write STEP, the preferred format for outsourced
 3D printing (JLCPCB takes exact B-rep instead of faceted meshes).
 
-Things this version does better than the .scad:
+Highlights over the retired OpenSCAD version:
   * All PCB data (M4 hole positions, board outline) is parsed directly from
     the KiCad PCB file at runtime, so a board revision can never silently
     desync the stand — the script asserts against the last hand-verified
@@ -106,7 +106,7 @@ PCB_H_EXPECTED = 154.0
 HOLE_TOL = 0.05
 SIZE_TOL = 0.5
 
-# --- geometry parameters, same names/defaults as case/scad/stand.scad ---------
+# --- geometry parameters (also see README) ------------------------------------
 plate_t = 6
 plate_margin = 10
 bottom_ext = 6.5  # plate below the PCB bottom edge; with base_t=8 the tilt=0
