@@ -21,9 +21,10 @@ Highlights over the retired OpenSCAD version:
     reprinting only the upright.
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
-  * Multiple mounting sets: the 4-hole pattern is repeated at several
-    in-plane rotation angles, so the keyboard (and with it the home row)
-    can be re-mounted at a different tilt.
+  * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
+    default 20 deg in-plane rotation = home-row slope), and the backplate
+    only rises to just above the topmost screw hole's vertical projection
+    (plus a rim) — the PCB above the top posts cantilevers on them.
 
 Mounting orientation (per user): the single extra pinky key on its stalk
 faces DOWN, the 3-key thumb cluster faces UP.
@@ -33,17 +34,11 @@ flipped vs the KiCad view per the mounting orientation above:
     u = Y_max - Y_kicad          (horizontal)
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
-Rotation sets — why 10 deg steps: one post set per angle, each set being
-the 4-hole pattern rotated about its centroid. 5-deg steps are impossible
-with 12 mm posts: adjacent sets' identical holes land only 4-5 mm apart and
-the posts would merge into a wall. 10-deg steps work when each set also
-slides sideways a little (SET_U_STEP); the solver shifts per set and raises
-it per set so that
-  * every post keeps >= 12 mm to every other post,
-  * the rotated board's lowest corner clears the base top by 2.5 mm
-    (rotation swings a board corner 8-17 mm below the nominal edge),
-  * each set's bottom post line stays >= 43 mm above the desk.
-The sets therefore staircase slightly upward with increasing angle.
+Rotation set — one 4-hole pattern per upright, rotated in-plane about its
+centroid by --set-angles (default 20 deg CCW in the front view; negate to
+mirror the tilt direction). The solver centers the set laterally and lifts
+it so the rotated board's lowest corner clears the base top by 2 mm
+(rotation swings a board corner ~14 mm below the nominal edge at 20 deg).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
@@ -54,7 +49,7 @@ Usage:
     uv run stand.py --part full              # fused assembly preview
     uv run stand.py --part joint             # small fit-test coupons
     uv run stand.py --part fit               # legacy flat validation plate
-    uv run stand.py --set-angles 10,20,30    # custom rotation sets
+    uv run stand.py --set-angles 20          # in-plane angle of the one set
     uv run stand.py --part base --step       # also export STEP for outsourcing
 """
 
@@ -111,7 +106,9 @@ plate_t = 6
 plate_margin = 10
 bottom_ext = 6.5  # plate below the PCB bottom edge; with base_t=8 the tilt=0
 #                  posture clears the base top by 2.5 mm (the tightest case)
-top_ext = 12
+top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
+#              backplate spans only the screw holes' desk projection (user
+#              sizing rule); PCB above the top posts cantilevers on them
 plate_r = 8
 post_d = 12
 nut_af = 7.4
@@ -132,7 +129,7 @@ haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
 rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
-#            clear every post of every rotation set AND the joint hardware
+#            clear every post AND the joint hardware
 rib_h = 60  # rib height up the back face
 pad_d = 20
 pad_recess = 0.8
@@ -181,12 +178,12 @@ nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
 #                   stays with the upright
 nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 
-# --- rotation sets -------------------------------------------------------------
-# One post set per angle; the keyboard is re-mounted on the chosen set to
-# tilt the home row. Angles are CCW in the front view — negate the list to
-# mirror the tilt direction. See the module docstring for why 5-deg steps
-# are impossible.
-SET_ANGLES = [10, 20, 30]  # deg, CCW in front view (negate to mirror tilt)
+# --- rotation set ---------------------------------------------------------------
+# A single 4-post set per upright; its in-plane rotation (--set-angles,
+# default 20 deg CCW in the front view, negate to mirror) sets the home-row
+# slope. The solver centers the set laterally and lifts it so the rotated
+# board's lowest corner clears the base top (BASE_TOP_MARGIN).
+SET_ANGLES = [20]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -408,7 +405,6 @@ class Stand:
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
-        self.plate_h = bottom_ext + pcb_h + top_ext
         self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
@@ -416,12 +412,22 @@ class Stand:
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
+        # Height rule (user): the upright only needs to cover, vertically, from
+        # the desk up to the topmost screw hole — the plate top edge clears the
+        # topmost post top (nut-pocket opening) by top_rim of world z; the PCB
+        # above the top posts cantilevers on the posts.
+        top_post_y = max(y for _, y in self.all_posts)
+        self.plate_h = (
+            top_post_y
+            + (plate_t + self.post_h) * self.st / self.ct
+            + top_rim / self.ct
+        )
         # plate must cover every post with room for the 6 mm radius + margin
         self.plate_half = max(pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + 8)
         self.plate_w = 2 * self.plate_half
         if self.plate_half > self.bx / 2:
             print(
-                f'warning: rotation sets need plate half-width {self.plate_half:.1f} '
+                f'warning: mounting set needs plate half-width {self.plate_half:.1f} '
                 f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
             )
         if self.plate_half < joint_screw_x + 5:
@@ -439,11 +445,11 @@ class Stand:
 
     def _solve_sets(self, angles: list[float]) -> list[tuple[float, list[tuple[float, float]]]]:
         """Place one 4-hole set per angle: rotate about the pattern centroid,
-        then pack — each set slides laterally (brute force over a shift grid)
-        and rises so that (a) the rotated board's lowest corner clears the
-        base top, (b) its bottom post line stays LINE_H_DESK above the desk,
-        and (c) all posts keep MIN_POST_CENTER apart. Optimizes for the
-        largest minimum post distance, tie-broken by a compact span."""
+        then pack — each set slides laterally (brute force over a shift grid,
+        also what centers a single set) and rises so that the rotated board's
+        lowest corner clears the base top and all posts keep MIN_POST_CENTER
+        apart. Optimizes for the largest minimum post distance, tie-broken by
+        a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
         cv = sum(v for _, v in self.holes) / len(self.holes)
         rel = [(u - cu, v - cv) for u, v in self.holes]
@@ -489,7 +495,11 @@ class Stand:
             )
             if dmin < MIN_POST_CENTER:
                 continue
-            key = (min(dmin, 20.0), -(max(combo) - min(combo)))
+            key = (
+                min(dmin, 20.0),
+                -(max(combo) - min(combo)),
+                -max(abs(s) for s in combo),  # prefer a centered set
+            )
             if best_key is None or key > best_key:
                 best, best_key = combo, key
         if best is None:
