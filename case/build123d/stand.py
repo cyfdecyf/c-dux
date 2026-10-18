@@ -24,7 +24,9 @@ Highlights over the retired OpenSCAD version:
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default 20 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
-    (plus a rim) — the PCB above the top posts cantilevers on them.
+    (plus a rim) — the PCB above the top posts cantilevers on them. Above
+    the rib band the outline tapers in to just envelope the post columns;
+    the plate never touches the PCB, so nothing else up there is needed.
 
 Mounting orientation (per user): the single extra pinky key on its stalk
 faces DOWN, the 3-key thumb cluster faces UP.
@@ -72,6 +74,7 @@ from build123d import (
     Plane,
     Polygon,
     Pos,
+    Rectangle,
     RectangleRounded,
     RegularPolygon,
     Rot,
@@ -111,6 +114,11 @@ top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              sizing rule); PCB above the top posts cantilevers on them
 plate_r = 8
 post_d = 12
+post_edge_margin = 8  # plate edge beyond a post center: post radius plus
+#                      pocket/wall; also the keep-out used by the taper
+#                      outline (_taper_outline)
+taper_margin = 2  # the full-width band extends this far above the rib tops
+#                  before the outline tapers in to the post columns
 nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
@@ -257,7 +265,7 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
 
     for ref, expected in HOLES_EXPECTED.items():
         got = holes[ref]
-        if any(abs(g - e) > HOLE_TOL for g, e in zip(got, expected)):
+        if any(abs(g - e) > HOLE_TOL for g, e in zip(got, expected, strict=True)):
             sys.exit(
                 f'error: hole {ref} moved: parsed {got} vs expected {expected}. '
                 'The PCB no longer matches the verified table — update '
@@ -406,6 +414,27 @@ def joint_coupon_boot():
 # ---------------------------------------------------------------------------
 
 
+def _convex_hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Andrew's monotone chain: strictly convex hull, CCW, no collinear pts."""
+    pts = sorted(set(pts))
+    if len(pts) < 3:
+        return []
+
+    def half(seq: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        out: list[tuple[float, float]] = []
+        for p in seq:
+            while len(out) >= 2 and (
+                (out[-1][0] - out[-2][0]) * (p[1] - out[-2][1])
+                - (out[-1][1] - out[-2][1]) * (p[0] - out[-2][0])
+                <= 0
+            ):
+                out.pop()
+            out.append(p)
+        return out
+
+    return half(pts)[:-1] + half(pts[::-1])[:-1]
+
+
 class Stand:
     def __init__(
         self,
@@ -441,8 +470,11 @@ class Stand:
             + (plate_t + self.post_h) * self.st / self.ct
             + top_rim / self.ct
         )
-        # plate must cover every post with room for the 6 mm radius + margin
-        self.plate_half = max(pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + 8)
+        # plate must cover every post with room for the radius + wall margin
+        keep = post_d / 2 + post_edge_margin
+        self.plate_half = max(
+            pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
+        )
         self.plate_w = 2 * self.plate_half
         if self.plate_half > self.bx / 2:
             print(
@@ -502,7 +534,7 @@ class Stand:
         for combo in itertools.product(cands, repeat=len(angles)):
             posts = [
                 (u + s - self.pcb_w / 2, v + bottom_ext)
-                for (_, _, pts), s in zip(lifted, combo)
+                for (_, _, pts), s in zip(lifted, combo, strict=True)
                 for u, v in pts
             ]
             if max(abs(x) for x, _ in posts) > PLATE_HALF_BOUND - 8:
@@ -528,7 +560,7 @@ class Stand:
             )
         out = []
         meta = []
-        for (ang, lift, pts), s in zip(lifted, best):
+        for (ang, lift, pts), s in zip(lifted, best, strict=True):
             r = math.radians(ang)
             vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
             corner_z = self.origin_z + (bottom_ext + vmin + lift) * self.ct + 11 * self.st
@@ -583,10 +615,42 @@ class Stand:
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
+    def _taper_outline(self) -> list[tuple[float, float]]:
+        """Retained outline above the full-width band: the convex hull of the
+        upper posts' keep-boxes (center +/- post_d/2 + post_edge_margin, top
+        clipped to the plate) plus the band's corners at the taper start. The
+        plate never touches the PCB, so up there it only carries the post
+        columns and the web between them — the hull is exactly that. Returns
+        [] when the band already reaches the plate top."""
+        y0 = rib_h / self.ct + taper_margin
+        if y0 >= self.plate_h:
+            return []
+        keep = post_d / 2 + post_edge_margin
+        pts = [(-self.plate_half, y0), (self.plate_half, y0)]
+        for x, y in self.all_posts:
+            if y + keep <= y0:
+                continue  # post stays inside the full-width band
+            pts += [
+                (x - keep, max(y - keep, y0)),
+                (x + keep, max(y - keep, y0)),
+                (x - keep, min(y + keep, self.plate_h)),
+                (x + keep, min(y + keep, self.plate_h)),
+            ]
+        return _convex_hull(pts)
+
     def plate_and_posts(self):
         solid = Pos(0, self.plate_h / 2, 0) * extrude(
             RectangleRounded(self.plate_w, self.plate_h, plate_r), plate_t
         )
+        # Taper the outline above the rib band: drop everything outside the
+        # post columns' hull (cutter = band-above-the-taper minus hull).
+        if hull := self._taper_outline():
+            y0 = rib_h / self.ct + taper_margin
+            band = Pos(-self.plate_half, y0) * Rectangle(
+                self.plate_w, self.plate_h - y0, align=(Align.MIN, Align.MIN)
+            )
+            cutter = band - Polygon(*hull, align=None)
+            solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
         for hole in self.all_posts:
             x, y = hole
             solid += Pos(x, y, plate_t) * (
@@ -823,7 +887,9 @@ def main() -> None:
                 stems.append(f'stand_{args.side}_fit')
 
     for stand, stem in zip(stands, stems, strict=True):
-        for (ang, pts), (_, _, _, corner_z) in zip(stand.sets, stand.set_meta):
+        for (ang, pts), (_, _, _, corner_z) in zip(
+            stand.sets, stand.set_meta, strict=True
+        ):
             print(
                 f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
                 f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm'
