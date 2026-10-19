@@ -16,10 +16,10 @@ C. Dux front               |  C. Dux back
 - **Rotary encoder** placed near thumb, easy to reach
 - **Diodless Reversible PCB**: Single PCB design that can be used for both left and right halves
 
-Note: I did not consider designing a case as I use the keyboard with nacked PCB.
+Note: I did not consider designing a case as I use the keyboard with naked PCB.
 So it's better to use leadless PCB and solder. I find SAC305 solder (with 380-degree solder iron)
 is a little harder to use compared to Tin-Lead 63/37 solder (with 280-degree solder iron),
-but not too much. 
+but not too much.
 
 ## Differences with rae-dux:
 
@@ -74,7 +74,7 @@ For non-key footprints (power/reset switches, etc.), my workflow is:
 ## My own build
 
 As I suffer from RSI, I choose the 20g pink Choc v1 switches (which is the lightest switches I know).
-For keycaps, I find the 3D printed saddle variant of 
+For keycaps, I find the 3D printed saddle variant of
 [KLP-Lame-Keycaps](https://github.com/braindefender/KLP-Lame-Keycaps) quite pleasant to use. The keycap
 curve makes it easy to press the up & down rows, and helps a lot to position fingers on the home row.
 

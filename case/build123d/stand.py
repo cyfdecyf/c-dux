@@ -21,9 +21,12 @@ Highlights over the retired OpenSCAD version:
     reprinting only the upright.
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
-  * Multiple mounting sets: the 4-hole pattern is repeated at several
-    in-plane rotation angles, so the keyboard (and with it the home row)
-    can be re-mounted at a different tilt.
+  * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
+    default 20 deg in-plane rotation = home-row slope), and the backplate
+    only rises to just above the topmost screw hole's vertical projection
+    (plus a rim) — the PCB above the top posts cantilevers on them. Above
+    the rib band the outline tapers in to just envelope the post columns;
+    the plate never touches the PCB, so nothing else up there is needed.
 
 Mounting orientation (per user): the single extra pinky key on its stalk
 faces DOWN, the 3-key thumb cluster faces UP.
@@ -33,17 +36,11 @@ flipped vs the KiCad view per the mounting orientation above:
     u = Y_max - Y_kicad          (horizontal)
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
-Rotation sets — why 10 deg steps: one post set per angle, each set being
-the 4-hole pattern rotated about its centroid. 5-deg steps are impossible
-with 12 mm posts: adjacent sets' identical holes land only 4-5 mm apart and
-the posts would merge into a wall. 10-deg steps work when each set also
-slides sideways a little (SET_U_STEP); the solver shifts per set and raises
-it per set so that
-  * every post keeps >= 12 mm to every other post,
-  * the rotated board's lowest corner clears the base top by 2.5 mm
-    (rotation swings a board corner 8-17 mm below the nominal edge),
-  * each set's bottom post line stays >= 43 mm above the desk.
-The sets therefore staircase slightly upward with increasing angle.
+Rotation set — one 4-hole pattern per upright, rotated in-plane about its
+centroid by --set-angles (default 20 deg CCW in the front view; negate to
+mirror the tilt direction). The solver centers the set laterally and lifts
+it so the rotated board's lowest corner clears the base top by 2 mm
+(rotation swings a board corner ~14 mm below the nominal edge at 20 deg).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
@@ -54,7 +51,7 @@ Usage:
     uv run stand.py --part full              # fused assembly preview
     uv run stand.py --part joint             # small fit-test coupons
     uv run stand.py --part fit               # legacy flat validation plate
-    uv run stand.py --set-angles 10,20,30    # custom rotation sets
+    uv run stand.py --set-angles 20          # in-plane angle of the one set
     uv run stand.py --part base --step       # also export STEP for outsourcing
 """
 
@@ -77,6 +74,7 @@ from build123d import (
     Plane,
     Polygon,
     Pos,
+    Rectangle,
     RectangleRounded,
     RegularPolygon,
     Rot,
@@ -109,21 +107,32 @@ SIZE_TOL = 0.5
 # --- geometry parameters (also see README) ------------------------------------
 plate_t = 6
 plate_margin = 10
-bottom_ext = 6.5  # plate below the PCB bottom edge; with base_t=8 the tilt=0
-#                  posture clears the base top by 2.5 mm (the tightest case)
-top_ext = 12
+bottom_ext = 6.5  # plate below the PCB bottom edge; the solver's v_floor
+#                  keeps the board's lowest corner clear of the base top
+top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
+#              backplate spans only the screw holes' desk projection (user
+#              sizing rule); PCB above the top posts cantilevers on them
 plate_r = 8
 post_d = 12
+post_edge_margin = 8  # plate edge beyond a post center: post radius plus
+#                      pocket/wall; also the keep-out used by the taper
+#                      outline (_taper_outline)
+taper_margin = 2  # the full-width band extends this far above the rib tops
+#                  before the outline tapers in to the post columns
 nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
 tap_d = 3.4
-base_t = 8  # the seat plane: base top = upright's boot bottom
-base_front = 40  # deeper towards the user: support polygon under the hands
+base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
+#            for walls around the (since deleted) coin slots; 6 is plenty
+#            for a flat slab and drops the keyboard 2 mm
+base_front = 30  # apron towards the user, trimmed for cost: typing loads
+#                 lean on the rear lever arm, the front pads carry little
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
-base_side = 16  # lateral margin past the PCB: 16 puts the base (144.5 mm)
-#                flush with the upright (plate 144 wide) instead of wider —
-#                material cost; the lateral stance rides on the pad spread
+base_side = 10  # lateral margin past the PCB: 10 makes the base (132.5 mm)
+#                exactly flush with the upright (plate 132.5 wide); the old 16
+#                predates a PCB/plate change and left 6 mm of dead slab per
+#                side — lateral stance rides on the pad spread
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -132,10 +141,14 @@ haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
 rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
-#            clear every post of every rotation set AND the joint hardware
+#            clear every post AND the joint hardware
 rib_h = 60  # rib height up the back face
 pad_d = 20
 pad_recess = 0.8
+pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
+#              as this allows — the tip-over pivots are the PAD contact lines,
+#              so every mm outward is a mm of tip lever (was 4: keep-out, not
+#              stability; 2 mm still leaves the 0.8 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 # --- base ↔ upright joint -------------------------------------------------------
@@ -153,14 +166,17 @@ TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
 joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
-key_h = 3.2  # shallower than its groove (key_h + joint_clear): the boot
-#             seats on the base top plane, never bottoming out on the keys
+key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
+#             top plane, never bottoming out on the keys
 key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
 key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
-boot_h = 6  # boot foot height; its top ledge hosts the nut pockets
+boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
+#            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = -2  # boot front edge — behind the plate front face at the seat
-boot_rear = 20  # boot rear edge (= rib wedge footprint depth)
+boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
+#                nut seats get a ~7 mm wall behind them instead of 1.2, and
+#                the wider seat patch adds compression area to the joint
 joint_screw_d = 4.5  # M4 clearance through boot + base
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
@@ -174,19 +190,20 @@ joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
 head_pocket_d = 8.0  # socket-head pocket in the base underside: the heads
 #                     must sit below the desk face or the base would rock
 head_pocket_h = 4.2
-boot_nut_clear = 1.6  # boot material between its bottom and the nut floor:
-#                      this pocket floor takes the clamp load
+boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
+#                      this pocket floor takes the clamp load — keep it
+#                      chunky, plastic creeps under a sustained bolt load
 nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
 #                   flats: push the nut in past the flexing lip and it
 #                   stays with the upright
 nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 
-# --- rotation sets -------------------------------------------------------------
-# One post set per angle; the keyboard is re-mounted on the chosen set to
-# tilt the home row. Angles are CCW in the front view — negate the list to
-# mirror the tilt direction. See the module docstring for why 5-deg steps
-# are impossible.
-SET_ANGLES = [10, 20, 30]  # deg, CCW in front view (negate to mirror tilt)
+# --- rotation set ---------------------------------------------------------------
+# A single 4-post set per upright; its in-plane rotation (--set-angles,
+# default 20 deg CCW in the front view, negate to mirror) sets the home-row
+# slope. The solver centers the set laterally and lifts it so the rotated
+# board's lowest corner clears the base top (BASE_TOP_MARGIN).
+SET_ANGLES = [20]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -248,7 +265,7 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
 
     for ref, expected in HOLES_EXPECTED.items():
         got = holes[ref]
-        if any(abs(g - e) > HOLE_TOL for g, e in zip(got, expected)):
+        if any(abs(g - e) > HOLE_TOL for g, e in zip(got, expected, strict=True)):
             sys.exit(
                 f'error: hole {ref} moved: parsed {got} vs expected {expected}. '
                 'The PCB no longer matches the verified table — update '
@@ -343,47 +360,79 @@ def joint_nut_pockets():
 
 
 def joint_grooves():
-    """Matching pockets in the boot underside, joint_clear deeper than the
-    keys are tall so the boot seats on the base top, not on the keys."""
+    """Key pockets in the boot underside, cut all the way through. The
+    joint_clear margin over the keys keeps the boot seated on the base top
+    plane, not on the keys; within key height the pocket walls are the shear
+    path either way, and the seat-plane bearing footprint is unchanged. The
+    open window also prints clean boot-down — the old blind-pocket roof was
+    a one-side-anchored 8.8 mm bridge for zero structural return."""
     grooves = None
     for sx in (-1, 1):
         groove = Pos(
             sx * key_x - key_l / 2 - joint_clear,
             key_y0 - joint_clear,
-            base_t,
+            base_t - EPS,
         ) * Box(
             key_l + 2 * joint_clear,
             key_w + 2 * joint_clear,
-            key_h + joint_clear,
+            boot_h + 2 * EPS,
             align=(MIN, MIN, MIN),
         )
         grooves = groove if grooves is None else grooves + groove
     return grooves
 
 
-def joint_coupons():
-    """Pair of mating fit-test coupons — a base fragment (key + screw bore +
-    head pocket) and a boot fragment (groove + nut seat) — printed flat
-    before committing to full parts: the 0.4 mm clearance and the nut lip
-    are the two things worth checking on your machine first. Both lie on
-    the bed, 40 mm apart."""
+def _coupon_box(z0: float, height: float):
+    """Common footprint for the two joint-coupon fragments: wide enough to
+    hold a key and a screw position at their production spacing."""
     frag_y0, frag_y1 = key_y0 - 18, key_y1 + 6
-    base_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t / 2) * Box(
-        2 * (joint_screw_x + 12), frag_y1 - frag_y0, base_t
+    return Pos(0, (frag_y0 + frag_y1) / 2, z0 + height / 2) * Box(
+        2 * (joint_screw_x + 12), frag_y1 - frag_y0, height
     )
-    base_c += joint_keys()
-    base_c -= joint_screw_bores() + joint_screw_head_pockets()
-    boot_c = Pos(0, (frag_y0 + frag_y1) / 2, base_t + boot_h / 2) * Box(
-        2 * (joint_screw_x + 12), frag_y1 - frag_y0, boot_h
-    )
-    boot_c -= joint_grooves() + joint_nut_pockets()
-    # drop the boot fragment onto the bed next to the base fragment
-    return base_c + Pos(0, frag_y1 - frag_y0 + 40, -base_t) * boot_c
+
+
+def joint_coupon_base():
+    """Fit-test coupon, base side: key + screw bore + head pocket, printed
+    flat. Checks the 0.4 mm key clearance and the head-pocket depth."""
+    c = _coupon_box(0, base_t)
+    c += joint_keys()
+    c -= joint_screw_bores() + joint_screw_head_pockets()
+    return c
+
+
+def joint_coupon_boot():
+    """Fit-test coupon, boot side: groove + nut seat (floor, hex pocket,
+    pinched mouth), printed flat on what would be the seat plane. Checks
+    the groove fit and whether the nut snaps past the lip and stays."""
+    c = _coupon_box(base_t, boot_h)
+    c -= joint_grooves() + joint_nut_pockets()
+    return Pos(0, 0, -base_t) * c  # onto the bed
 
 
 # ---------------------------------------------------------------------------
 # Geometry
 # ---------------------------------------------------------------------------
+
+
+def _convex_hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Andrew's monotone chain: strictly convex hull, CCW, no collinear pts."""
+    pts = sorted(set(pts))
+    if len(pts) < 3:
+        return []
+
+    def half(seq: list[tuple[float, float]]) -> list[tuple[float, float]]:
+        out: list[tuple[float, float]] = []
+        for p in seq:
+            while len(out) >= 2 and (
+                (out[-1][0] - out[-2][0]) * (p[1] - out[-2][1])
+                - (out[-1][1] - out[-2][1]) * (p[0] - out[-2][0])
+                <= 0
+            ):
+                out.pop()
+            out.append(p)
+        return out
+
+    return half(pts)[:-1] + half(pts[::-1])[:-1]
 
 
 class Stand:
@@ -404,7 +453,6 @@ class Stand:
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
-        self.plate_h = bottom_ext + pcb_h + top_ext
         self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
@@ -412,12 +460,25 @@ class Stand:
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
-        # plate must cover every post with room for the 6 mm radius + margin
-        self.plate_half = max(pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + 8)
+        # Height rule (user): the upright only needs to cover, vertically, from
+        # the desk up to the topmost screw hole — the plate top edge clears the
+        # topmost post top (nut-pocket opening) by top_rim of world z; the PCB
+        # above the top posts cantilevers on the posts.
+        top_post_y = max(y for _, y in self.all_posts)
+        self.plate_h = (
+            top_post_y
+            + (plate_t + self.post_h) * self.st / self.ct
+            + top_rim / self.ct
+        )
+        # plate must cover every post with room for the radius + wall margin
+        keep = post_d / 2 + post_edge_margin
+        self.plate_half = max(
+            pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
+        )
         self.plate_w = 2 * self.plate_half
         if self.plate_half > self.bx / 2:
             print(
-                f'warning: rotation sets need plate half-width {self.plate_half:.1f} '
+                f'warning: mounting set needs plate half-width {self.plate_half:.1f} '
                 f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
             )
         if self.plate_half < joint_screw_x + 5:
@@ -435,11 +496,11 @@ class Stand:
 
     def _solve_sets(self, angles: list[float]) -> list[tuple[float, list[tuple[float, float]]]]:
         """Place one 4-hole set per angle: rotate about the pattern centroid,
-        then pack — each set slides laterally (brute force over a shift grid)
-        and rises so that (a) the rotated board's lowest corner clears the
-        base top, (b) its bottom post line stays LINE_H_DESK above the desk,
-        and (c) all posts keep MIN_POST_CENTER apart. Optimizes for the
-        largest minimum post distance, tie-broken by a compact span."""
+        then pack — each set slides laterally (brute force over a shift grid,
+        also what centers a single set) and rises so that the rotated board's
+        lowest corner clears the base top and all posts keep MIN_POST_CENTER
+        apart. Optimizes for the largest minimum post distance, tie-broken by
+        a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
         cv = sum(v for _, v in self.holes) / len(self.holes)
         rel = [(u - cu, v - cv) for u, v in self.holes]
@@ -473,7 +534,7 @@ class Stand:
         for combo in itertools.product(cands, repeat=len(angles)):
             posts = [
                 (u + s - self.pcb_w / 2, v + bottom_ext)
-                for (_, _, pts), s in zip(lifted, combo)
+                for (_, _, pts), s in zip(lifted, combo, strict=True)
                 for u, v in pts
             ]
             if max(abs(x) for x, _ in posts) > PLATE_HALF_BOUND - 8:
@@ -485,7 +546,11 @@ class Stand:
             )
             if dmin < MIN_POST_CENTER:
                 continue
-            key = (min(dmin, 20.0), -(max(combo) - min(combo)))
+            key = (
+                min(dmin, 20.0),
+                -(max(combo) - min(combo)),
+                -max(abs(s) for s in combo),  # prefer a centered set
+            )
             if best_key is None or key > best_key:
                 best, best_key = combo, key
         if best is None:
@@ -495,7 +560,7 @@ class Stand:
             )
         out = []
         meta = []
-        for (ang, lift, pts), s in zip(lifted, best):
+        for (ang, lift, pts), s in zip(lifted, best, strict=True):
             r = math.radians(ang)
             vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
             corner_z = self.origin_z + (bottom_ext + vmin + lift) * self.ct + 11 * self.st
@@ -543,17 +608,49 @@ class Stand:
     # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
-        px = self.bx / 2 - base_r - 4
-        fy = self.y0 + base_r + 4
-        ry = self.y1 - base_r - 4
+        px = self.bx / 2 - base_r - pad_edge
+        fy = self.y0 + base_r + pad_edge
+        ry = self.y1 - base_r - pad_edge
         return [(-px, fy), (px, fy), (0, fy), (-px, ry), (px, ry), (0, ry)]
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
+
+    def _taper_outline(self) -> list[tuple[float, float]]:
+        """Retained outline above the full-width band: the convex hull of the
+        upper posts' keep-boxes (center +/- post_d/2 + post_edge_margin, top
+        clipped to the plate) plus the band's corners at the taper start. The
+        plate never touches the PCB, so up there it only carries the post
+        columns and the web between them — the hull is exactly that. Returns
+        [] when the band already reaches the plate top."""
+        y0 = rib_h / self.ct + taper_margin
+        if y0 >= self.plate_h:
+            return []
+        keep = post_d / 2 + post_edge_margin
+        pts = [(-self.plate_half, y0), (self.plate_half, y0)]
+        for x, y in self.all_posts:
+            if y + keep <= y0:
+                continue  # post stays inside the full-width band
+            pts += [
+                (x - keep, max(y - keep, y0)),
+                (x + keep, max(y - keep, y0)),
+                (x - keep, min(y + keep, self.plate_h)),
+                (x + keep, min(y + keep, self.plate_h)),
+            ]
+        return _convex_hull(pts)
 
     def plate_and_posts(self):
         solid = Pos(0, self.plate_h / 2, 0) * extrude(
             RectangleRounded(self.plate_w, self.plate_h, plate_r), plate_t
         )
+        # Taper the outline above the rib band: drop everything outside the
+        # post columns' hull (cutter = band-above-the-taper minus hull).
+        if hull := self._taper_outline():
+            y0 = rib_h / self.ct + taper_margin
+            band = Pos(-self.plate_half, y0) * Rectangle(
+                self.plate_w, self.plate_h - y0, align=(Align.MIN, Align.MIN)
+            )
+            cutter = band - Polygon(*hull, align=None)
+            solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
         for hole in self.all_posts:
             x, y = hole
             solid += Pos(x, y, plate_t) * (
@@ -657,8 +754,6 @@ class Stand:
         if part == 'upright':
             body = self.upright_solid()
             return mirror(body, about=Plane.YZ) if side == 'right' else body
-        if part == 'joint':
-            return joint_coupons()
         # 'full': fused assembly preview of the two parts
         body = self.base_solid() + self.upright_solid()
         return mirror(body, about=Plane.YZ) if side == 'right' else body
@@ -766,7 +861,8 @@ def main() -> None:
         push_viewer(part, stem)
 
     if args.part == 'joint':
-        emit(joint_coupons(), 'joint_coupons')
+        emit(joint_coupon_base(), 'joint_coupon_base')
+        emit(joint_coupon_boot(), 'joint_coupon_boot')
         return
 
     # The base is tilt- and side-independent: one Stand, one export.
@@ -791,7 +887,9 @@ def main() -> None:
                 stems.append(f'stand_{args.side}_fit')
 
     for stand, stem in zip(stands, stems, strict=True):
-        for (ang, pts), (_, _, _, corner_z) in zip(stand.sets, stand.set_meta):
+        for (ang, pts), (_, _, _, corner_z) in zip(
+            stand.sets, stand.set_meta, strict=True
+        ):
             print(
                 f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
                 f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm'
