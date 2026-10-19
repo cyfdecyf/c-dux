@@ -116,11 +116,14 @@ nut_h = 3.4
 screw_d = 4.5
 tap_d = 3.4
 base_t = 8  # the seat plane: base top = upright's boot bottom
-base_front = 40  # deeper towards the user: support polygon under the hands
+base_front = 32  # depth towards the user: forward-tip (pull/bump) margin only;
+#                  deliberately the smaller half — the recurring typing load
+#                  tips the stand REARWARD, that margin lives in base_rear
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
-base_side = 16  # lateral margin past the PCB: 16 puts the base (144.5 mm)
-#                flush with the upright (plate 144 wide) instead of wider —
-#                material cost; the lateral stance rides on the pad spread
+base_side = 10  # lateral margin past the PCB: 10 makes the base (132.5 mm)
+#                exactly flush with the upright (plate 132.5 wide); the old 16
+#                predates a PCB/plate change and left 6 mm of dead slab per
+#                side — lateral stance rides on the pad spread
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -133,6 +136,10 @@ rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
 rib_h = 60  # rib height up the back face
 pad_d = 20
 pad_recess = 0.8
+pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
+#              as this allows — the tip-over pivots are the PAD contact lines,
+#              so every mm outward is a mm of tip lever (was 4: keep-out, not
+#              stability; 2 mm still leaves the 0.8 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 # --- base ↔ upright joint -------------------------------------------------------
@@ -557,9 +564,9 @@ class Stand:
     # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
-        px = self.bx / 2 - base_r - 4
-        fy = self.y0 + base_r + 4
-        ry = self.y1 - base_r - 4
+        px = self.bx / 2 - base_r - pad_edge
+        fy = self.y0 + base_r + pad_edge
+        ry = self.y1 - base_r - pad_edge
         return [(-px, fy), (px, fy), (0, fy), (-px, ry), (px, ry), (0, ry)]
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
