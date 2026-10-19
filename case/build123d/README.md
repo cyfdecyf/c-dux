@@ -156,6 +156,8 @@ uv run stand.py --set-angles 20            # 安装组平面内旋转角(默认 
 ## 键盘离台高度与底座尺寸
 
 ![底座 front/rear/进深与抗倾力臂示意](../../images/stand-base-dimensions.png)
+（由 `base_dims_diagram.py` 从 `stand.py` 常量自动生成，
+`uv run base_dims_diagram.py` 重新出图；PNG 需要系统装 rsvg-convert）
 
 键盘的最低点 = 旋转后板角的最低角点(实测 19 颗键的键帽都不超出板边,
 键帽不会比板角更低)。高度约束只有一条:**旋转后 PCB 最低点距底座顶面
