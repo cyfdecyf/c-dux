@@ -58,10 +58,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import itertools
 import math
 import re
 import sys
+import warnings
 
 from pathlib import Path
 
@@ -964,18 +967,29 @@ def summary(name: str, part) -> None:
 
 
 def push_viewer(part, name: str) -> None:
-    """Send the model to the OCP CAD Viewer (VS Code). Best effort, never
-    fatal — exporting must not depend on the viewer running."""
+    """Send the model to the OCP CAD Viewer (VS Code). Best effort: never
+    fatal, never noisy — the library prints (and sometimes swallows) its own
+    connection errors, so its output is captured and condensed into one line
+    when the viewer is closed or half-open."""
+    buf_out, buf_err = io.StringIO(), io.StringIO()
+    exc: Exception | None = None
     try:
-        from ocp_vscode import Camera, show
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                from ocp_vscode import Camera, show
+
+                show(part, names=[name], reset_camera=Camera.CENTER)
     except ImportError:
         print('note: viewer push skipped — install with: uv add --dev ocp-vscode')
         return
-    try:
-        show(part, names=[name], reset_camera=Camera.CENTER)
+    except Exception as e:
+        exc = e
+    if exc is None and not buf_err.getvalue().strip():
         print(f'pushed to OCP CAD Viewer: {name}')
-    except Exception as exc:
-        print(f'note: viewer push skipped ({type(exc).__name__}: {exc})')
+    else:
+        detail = buf_err.getvalue().strip().splitlines() or [str(exc) or 'unknown error']
+        print(f'note: viewer push skipped ({detail[0][:100]})')
 
 
 def main() -> None:
@@ -1051,7 +1065,6 @@ def main() -> None:
             step = args.out / f'{stem}.step'
             export_step(part, step)
             print(f'          {step}')
-        push_viewer(part, stem)
 
     if args.part == 'joint':
         emit(joint_coupon_base(), 'joint_coupon_base')
