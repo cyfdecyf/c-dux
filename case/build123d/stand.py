@@ -144,7 +144,14 @@ rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
 #            clear every post AND the joint hardware
 rib_h = 60  # rib height up the back face
 pad_d = 20
-pad_recess = 0.8
+pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia,
+#                same baseline as joint_clear)
+pad_recess = 0.8  # pocket depth ≈ pad thickness, pad face ends up flush
+pad_seat_w = 3.0  # flat seat annulus at full depth; inboard of it the floor
+#                   rises at 45° to a flush center. Face-down, only this 3 mm
+#                   annulus bridges — a full flat floor is a suspended Ø20
+#                   bridge and sagged badly in the first print. The wall +
+#                   seat band keep the pad edge captured so it cannot creep.
 pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              as this allows — the tip-over pivots are the PAD contact lines,
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
@@ -177,7 +184,8 @@ boot_front = -2  # boot front edge — behind the plate front face at the seat
 boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
 #                nut seats get a ~7 mm wall behind them instead of 1.2, and
 #                the wider seat patch adds compression area to the joint
-joint_screw_d = 4.5  # M4 clearance through boot + base
+joint_screw_d = 4.7  # M4 clearance through boot + base; 4.5 printed undersize
+#                     and oval (FDM hole shrink) — +0.2 keeps the screw free
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
 joint_screw_y = 14.5
@@ -318,12 +326,30 @@ def joint_screw_bores():
 def joint_screw_head_pockets():
     """Socket-head pockets open at the base underside: the heads must sit
     below the desk face or the base would rock on them, and the driver
-    works from the open bottom anyway."""
+    works from the open bottom anyway.
+
+    The shoulder is a 45° cone (head_pocket_d at head_pocket_h, rising to
+    the clearance bore) rather than a flat annulus: face-down, a flat
+    shoulder prints as a suspended Ø8 bridge — saggy on the exact surface
+    the head clamps against. The cone prints layer-supported and the Ø7
+    head bears on the cone's Ø7 ring; clamp stays axial."""
+    cone_h = (head_pocket_d - joint_screw_d) / 2
+    assert head_pocket_h + cone_h < base_t, (
+        'head pocket + shoulder cone must stay inside base_t'
+    )
     pockets = None
     for sx in (-1, 1):
         pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        pocket += Pos(
+            sx * joint_screw_x, joint_screw_y, head_pocket_h - EPS
+        ) * Cone(
+            head_pocket_d / 2,
+            joint_screw_d / 2,
+            cone_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
         )
         pockets = pocket if pockets is None else pockets + pocket
@@ -692,9 +718,24 @@ class Stand:
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
-            base -= Pos(px, py, -EPS) * Cylinder(
-                pad_d / 2, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
+            # Pad pocket: vertical wall at pad_d + 2*pad_fit captures the pad
+            # edge (no creep), pad_seat_w flat annulus is the seat, then a
+            # 45° cone up to the flush center — face-down, only the seat
+            # annulus bridges (the first print's full-flat Ø20 floor sagged).
+            ro = pad_d / 2 + pad_fit
+            ri = ro - pad_seat_w
+            pocket = Pos(px, py, -EPS) * Cylinder(
+                ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
+            ) - Pos(px, py, -EPS) * Cylinder(
+                ri, pad_recess + 3 * EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
+            pocket += Pos(px, py, -EPS) * Cone(
+                ri + EPS,
+                ri - pad_recess,
+                pad_recess + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+            base -= pocket
         base += joint_keys()
         base -= joint_screw_bores() + joint_screw_head_pockets()
         return base
