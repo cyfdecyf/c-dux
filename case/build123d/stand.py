@@ -515,10 +515,33 @@ class Stand:
             pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
         )
         self.plate_w = 2 * self.plate_half
+        # the bottom band stays flush with the base; a post whose keep-box
+        # pokes past the base width keeps a local bulge instead of widening
+        # the whole part
+        self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
+        for sx in (-1, 1):
+            spans = sorted(
+                (y - keep, min(y + keep, self.plate_h))
+                for x, y in self.all_posts
+                if (x > 0) == (sx > 0) and abs(x) + keep > self.bx / 2
+            )
+            merged: list[list[float]] = []
+            for lo, hi in spans:
+                if merged and lo <= merged[-1][1]:
+                    merged[-1][1] = max(merged[-1][1], hi)
+                else:
+                    merged.append([lo, hi])
+            if merged:
+                self.bulges.append((sx, [tuple(m) for m in merged]))
         if self.plate_half > self.bx / 2:
+            spans_txt = ' / '.join(
+                f'side {sx:+d} y '
+                + ', '.join(f'{lo:.0f}..{hi:.0f}' for lo, hi in spans)
+                for sx, spans in self.bulges
+            )
             print(
-                f'warning: mounting set needs plate half-width {self.plate_half:.1f} '
-                f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
+                f'note: bottom band flush with the base ({self.bx:.1f} mm); '
+                f'post bulge(s) kept at {spans_txt}'
             )
         if self.plate_half < joint_screw_x + 5:
             sys.exit(
@@ -665,7 +688,9 @@ class Stand:
         if y0 >= self.plate_h:
             return []
         keep = post_d / 2 + post_edge_margin
-        pts = [(-self.plate_half, y0), (self.plate_half, y0)]
+        # hull bottom corners at the base width: the bottom band is flush;
+        # post keep-boxes past it widen the hull locally (the bulge)
+        pts = [(-self.bx / 2, y0), (self.bx / 2, y0)]
         for x, y in self.all_posts:
             if y + keep <= y0:
                 continue  # post stays inside the full-width band
@@ -695,7 +720,8 @@ class Stand:
             for a, b in zip(hull, hull[1:] + hull[:1], strict=True)
             if not (abs(a[1] - y0) < 1e-6 and abs(b[1] - y0) < 1e-6)
             # band boundary skipped: material continues below it, it is
-            # not a free edge
+            # not a free edge; the grid stays r+lighten_wall inside the
+            # flush bottom band (±bx/2), so its side edges need no check
         ]
         r = lighten_r
         while r >= 8:
@@ -703,8 +729,8 @@ class Stand:
             for _ in range(lighten_max):
                 best, best_score = None, r + lighten_wall
                 for gx in range(
-                    int(-self.plate_half + r + lighten_wall),
-                    int(self.plate_half - r - lighten_wall) + 1,
+                    int(-self.bx / 2 + r + lighten_wall),
+                    int(self.bx / 2 - r - lighten_wall) + 1,
                     4,
                 ):
                     # over a rib: stay above its tip; else the junction zone
@@ -749,6 +775,23 @@ class Stand:
             )
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
+        # flush sides: cap the plate at the base width; on a side whose post
+        # keep-box pokes past it, only the bulge span stays at full width
+        over = self.plate_half - self.bx / 2
+        for sx in (-1, 1):
+            spans = dict(self.bulges).get(sx, [])
+            y_prev = 0.0
+            for lo, hi in [*spans, (self.plate_h, self.plate_h)]:
+                if lo > y_prev:
+                    solid -= Pos(
+                        sx * (self.bx / 2 + over / 2), (y_prev + lo) / 2, -EPS
+                    ) * Box(
+                        over,
+                        lo - y_prev,
+                        plate_t + 2 * EPS,
+                        align=(Align.CENTER, Align.CENTER, MIN),
+                    )
+                y_prev = hi
         # Lightening holes in the web: the freest spot only, so no hole ever
         # touches a load path (post columns, outline, top/bottom edges).
         for hx, hy in self._lighten_holes():
@@ -829,13 +872,16 @@ class Stand:
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
+        # boot + haunch stay flush with the base even when the plate keeps a
+        # post bulge further up
+        flush_w = min(self.plate_w, self.bx)
         boot = Pos(0, (boot_front + boot_rear) / 2, base_t + boot_h / 2) * Box(
-            self.plate_w, boot_rear - boot_front, boot_h
+            flush_w, boot_rear - boot_front, boot_h
         )
         # Full-width haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner corner.
-        boot += Pos(-self.plate_w / 2, boot_front, base_t) * extrude(
-            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), self.plate_w
+        boot += Pos(-flush_w / 2, boot_front, base_t) * extrude(
+            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), flush_w
         )
         # Ribs continue up the back face into the hammering zone.
         for rx in self.rib_x:
