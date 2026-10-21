@@ -474,6 +474,15 @@ def _seg_dist(p, a, b):
     return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
 
 
+def _ccw(pts):
+    """Point list normalized to counter-clockwise winding."""
+    area = sum(
+        pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1]
+        for i in range(len(pts))
+    )
+    return pts if area > 0 else pts[::-1]
+
+
 class Stand:
     def __init__(
         self,
@@ -776,22 +785,41 @@ class Stand:
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
         # flush sides: cap the plate at the base width; on a side whose post
-        # keep-box pokes past it, only the bulge span stays at full width
+        # keep-box pokes past it, the tab grows out of the flush edge through
+        # tangent quarter-round shoulders (clear of the post keep circle)
         over = self.plate_half - self.bx / 2
         for sx in (-1, 1):
             spans = dict(self.bulges).get(sx, [])
-            y_prev = 0.0
-            for lo, hi in [*spans, (self.plate_h, self.plate_h)]:
-                if lo > y_prev:
-                    solid -= Pos(
-                        sx * (self.bx / 2 + over / 2), (y_prev + lo) / 2, -EPS
-                    ) * Box(
-                        over,
-                        lo - y_prev,
-                        plate_t + 2 * EPS,
-                        align=(Align.CENTER, Align.CENTER, MIN),
-                    )
-                y_prev = hi
+            x_mid = sx * (self.bx / 2 + over / 2)
+            if not spans:
+                solid -= Pos(x_mid, self.plate_h / 2, -EPS) * Box(
+                    over, self.plate_h, plate_t + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
+                continue
+            lo0, hi0 = spans[0]
+            x_in, x_out = self.bx / 2, self.plate_half
+            pts = [(x_in, 0.0), (x_in, lo0 - over)]
+            pts += [
+                (x_in + sx * over * math.cos(math.radians(t)), lo0 + over * math.sin(math.radians(t)))
+                for t in range(270 + 15, 361, 15)
+            ]
+            pts += [(x_out, hi0)]
+            pts += [
+                (x_in + sx * over * math.cos(math.radians(t)), hi0 + over * math.sin(math.radians(t)))
+                for t in range(15, 91, 15)
+            ]
+            pts += [(x_in, self.plate_h), (x_out, self.plate_h), (x_out, 0.0)]
+            if sx < 0:
+                pts = [(-x, y) for x, y in reversed(pts)]
+            solid -= Pos(0, 0, -EPS) * extrude(
+                Polygon(*_ccw(pts), align=None), plate_t + 2 * EPS
+            )
+            for (_, hi_a), (_, lo_b) in itertools.pairwise(spans):
+                solid -= Pos(x_mid, (hi_a + lo_b) / 2, -EPS) * Box(
+                    over, lo_b - hi_a, plate_t + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
         # Lightening holes in the web: the freest spot only, so no hole ever
         # touches a load path (post columns, outline, top/bottom edges).
         for hx, hy in self._lighten_holes():
