@@ -795,10 +795,11 @@ class Stand:
             spans = dict(self.bulges).get(sx, [])
             x_mid = sx * (self.bx / 2 + over / 2)
             if not spans:
-                solid -= Pos(x_mid, self.plate_h / 2, -EPS) * Box(
-                    over, self.plate_h, plate_t + 2 * EPS,
-                    align=(Align.CENTER, Align.CENTER, MIN),
-                )
+                if over > EPS:  # exactly base-flush: nothing past the edge
+                    solid -= Pos(x_mid, self.plate_h / 2, -EPS) * Box(
+                        over, self.plate_h, plate_t + 2 * EPS,
+                        align=(Align.CENTER, Align.CENTER, MIN),
+                    )
                 continue
             lo0, hi0 = spans[0]
             x_in, x_out = self.bx / 2, self.plate_half
