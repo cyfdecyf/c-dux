@@ -122,12 +122,6 @@ post_edge_margin = 8  # plate edge beyond a post center: post radius plus
 #                      outline (_taper_outline)
 taper_margin = 2  # the full-width band extends this far above the rib tops
 #                  before the outline tapers in to the post columns
-lighten_r = 26  # web lightening-hole radius (0 disables). Placed at the
-#                freest spot of the web; shrinks by 2 if nothing fits
-lighten_wall = 10  # min material between hole edge and outline / post keep
-lighten_max = 3  # holes wanted
-junction_keep = 35  # holes stay at least this far above the seat plane: the
-#                     bottom band is the junction's compression path
 nut_af = 7.4
 nut_h = 3.4
 screw_d = 4.5
@@ -470,13 +464,6 @@ def _convex_hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
     return half(pts)[:-1] + half(pts[::-1])[:-1]
 
 
-def _seg_dist(p, a, b):
-    """Distance from point p to segment ab."""
-    dx, dy = b[0] - a[0], b[1] - a[1]
-    t = max(0.0, min(1.0, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / (dx * dx + dy * dy)))
-    return math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy))
-
-
 def _ccw(pts):
     """Point list normalized to counter-clockwise winding."""
     area = sum(
@@ -714,66 +701,6 @@ class Stand:
             ]
         return _convex_hull(pts)
 
-    def _lighten_holes(self) -> list[tuple[float, float]]:
-        """Lightening holes in the web: greedy farthest-point placement over
-        the tapered region (holes may dip into the full-width band), keeping
-        lighten_wall to the outline slants and to each post's keep circle
-        (post radius + post_edge_margin + wall). Below the rib tips the hole
-        stays clear of the rib x-ranges, otherwise of the junction zone, so
-        no hole touches a load path. Deterministic: coarse grid,
-        max-clearance score; radius shrinks by 2 if nothing fits."""
-        hull = self._taper_outline()
-        if lighten_r <= 0 or len(hull) < 3:
-            return []
-        y0 = rib_h / self.ct + taper_margin
-        rib_top = rib_h / self.ct
-        edges = [
-            (a, b)
-            for a, b in zip(hull, hull[1:] + hull[:1], strict=True)
-            if not (abs(a[1] - y0) < 1e-6 and abs(b[1] - y0) < 1e-6)
-            # band boundary skipped: material continues below it, it is
-            # not a free edge; the grid stays r+lighten_wall inside the
-            # flush bottom band (±bx/2), so its side edges need no check
-        ]
-        r = lighten_r
-        while r >= 8:
-            holes: list[tuple[float, float]] = []
-            for _ in range(lighten_max):
-                best, best_score = None, r + lighten_wall
-                for gx in range(
-                    int(-self.bx / 2 + r + lighten_wall),
-                    int(self.bx / 2 - r - lighten_wall) + 1,
-                    4,
-                ):
-                    # over a rib: stay above its tip; else the junction zone
-                    y_lo = (
-                        rib_top + 10
-                        if any(abs(gx - rx) < rib_t / 2 + r + 4 for rx in self.rib_x)
-                        else junction_keep
-                    )
-                    for gy in range(int(y_lo + r), int(self.plate_h - r - lighten_wall), 4):
-                        p = (float(gx), float(gy))
-                        if any(math.dist(p, h) < 2 * r + 10 for h in holes):
-                            continue
-                        if any(
-                            math.dist(p, q) < r + post_d / 2 + post_edge_margin + 6
-                            for q in self.all_posts
-                        ):
-                            continue
-                        score = min(
-                            min(_seg_dist(p, a, b) for a, b in edges),
-                            min((math.dist(p, q) for q in self.all_posts), default=1e9),
-                        )
-                        if score > best_score:
-                            best, best_score = p, score
-                if best is None:
-                    break
-                holes.append(best)
-            if holes:
-                return holes
-            r -= 2
-        return []
-
     def plate_and_posts(self):
         solid = Pos(0, self.plate_h / 2, 0) * extrude(
             RectangleRounded(self.plate_w, self.plate_h, plate_r), plate_t
@@ -824,12 +751,6 @@ class Stand:
                     over, lo_b - hi_a, plate_t + 2 * EPS,
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
-        # Lightening holes in the web: the freest spot only, so no hole ever
-        # touches a load path (post columns, outline, top/bottom edges).
-        for hx, hy in self._lighten_holes():
-            solid -= Pos(hx, hy, -EPS) * Cylinder(
-                lighten_r, plate_t + 2 * EPS, align=(Align.CENTER, Align.CENTER, MIN)
-            )
         for hole in self.all_posts:
             x, y = hole
             solid += Pos(x, y, plate_t) * (
