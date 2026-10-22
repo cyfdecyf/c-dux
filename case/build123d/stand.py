@@ -187,6 +187,14 @@ boot_front = -2  # boot front edge — behind the plate front face at the seat
 boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
 #                nut seats get a ~7 mm wall behind them instead of 1.2, and
 #                the wider seat patch adds compression area to the joint
+lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
+#                   lip; 0 disables. Anchored at the plate's seat-plane
+#                   corner (y=0, z=base_t) so the 45 deg face bounds the
+#                   print from layer 1: the raw bottom edge face sweeps
+#                   over the bed at (90 - tilt) from horizontal - in front
+#                   of the boot it printed as a floating ramp (0.55
+#                   mm/layer at 20 deg); at 45 deg each layer advances
+#                   <= half a line width, so the ramp is float-free
 joint_screw_d = 4.7  # M4 clearance through boot + base; 4.5 printed undersize
 #                     and oval (FDM hole shrink) — +0.2 keeps the screw free
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
@@ -818,13 +826,33 @@ class Stand:
 
     def upright_solid(self):
         """The demountable half: everything above the seat plane, printed
-        boot-down on the bed, support-free like the old one-piece print."""
+        boot-down on the bed. Exported pose is the print pose; layer-by-layer
+        audits (facets + per-layer float) show no bridging and no air-start
+        once the front lip is chamfered."""
         rad = math.radians(self.tilt)
         body = (
             Pos(0, 0, self.origin_z)
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
+        if lip_chamfer > 0:
+            # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
+            # Applied before the boot union: the cut plane starts at the
+            # plate's seat-plane corner, inside the boot footprint, so the
+            # boot itself is untouched.
+            body -= (
+                Pos(-(self.plate_w + 20) / 2, 0, 0)
+                * extrude(
+                    Plane.YZ
+                    * Polygon(
+                        (0, base_t),
+                        (-lip_chamfer, base_t + lip_chamfer),
+                        (-lip_chamfer, base_t),
+                        align=None,
+                    ),
+                    self.plate_w + 20,
+                )
+            )
         # boot + haunch stay flush with the base even when the plate keeps a
         # post bulge further up
         flush_w = min(self.plate_w, self.bx)
