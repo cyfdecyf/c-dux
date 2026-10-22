@@ -75,6 +75,7 @@ uv run stand.py --part base                # 共享底座(打印一次,不分左
 uv run stand.py --part upright             # 左立板,20° 后仰
 uv run stand.py --side right --part upright
 uv run stand.py --part upright --tilt 10,15,20,25,30   # 一批角度的立板
+uv run stand.py --part upright --flange 8   # 立板加可掰法兰(黏板保险)
 uv run stand.py --part full                # 装配预览(两件布尔并,左半)
 uv run stand.py --part joint               # 配合试块(先打这个!)
 uv run stand.py --part fit                 # 平板验证件(旧,柱位实配用)
@@ -98,6 +99,7 @@ uv run stand.py --set-angles 20            # 安装组平面内旋转角(默认 
 | `--set-angles` | `20` | 安装组的平面内旋转角(度) |
 | `--post-h` | 5 | 柱高 = PCB 与背板间隙 |
 | `--attach` | `nut` | `nut` 螺母沉孔 / `tap` 自攻(仅 PCB 柱位) |
+| `--flange` | `0` | 靴座四周可掰法兰,值 = 外伸宽度(mm);底板黏性不足的保险,打印后掰掉 |
 | `--show` | — | 只推送到 OCP CAD Viewer 预览,不导出文件 |
 | `--pcb` | `pcb/v2.0/c-dux.kicad_pcb` | 孔位与板框来源 |
 | `--out` | `out/` | 输出目录 |
@@ -204,8 +206,10 @@ d = 重心到后垫线的距离,`base_rear` 与胶垫外伸量(`pad_edge`)各自
 - **材料干燥**:PETG 新开封可直接打,敞开放置较久或潮湿环境先
   65 °C 烘 6–8 h(打印机/料盒的干燥功能均可);
 - **切片**:`out/*.stl` 直接导入 Bambu Studio(STEP 是代打格式,
-  自打用不上);导入后**保持建模姿态**——关自动摆正、支撑与
-  brim;0.2 mm 层高、3–4 层壁、10–15% Gyroid 填充,顶/底层默认;
+  自打用不上);导入后**保持建模姿态**——关自动摆正与支撑;底板
+  黏性不足时不加 brim,出图时改用 `--flange` 可掰法兰(打印后掰掉,
+  不留在零件上,也不弄脏外观面);0.2 mm 层高、3–4 层壁、10–15%
+  Gyroid 填充,顶/底层默认;
   PLA 勿开主动加热腔(用 PLA 预设即可),PETG 无此顾虑;H2C 成型
   尺寸 325 × 320 mm,两件可同板一次打完;
 - **先打试件**:`--part joint` 验证榫键推入手感与螺母收口唇,流程

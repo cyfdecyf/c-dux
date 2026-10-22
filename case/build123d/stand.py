@@ -195,6 +195,9 @@ lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
 #                   of the boot it printed as a floating ramp (0.55
 #                   mm/layer at 20 deg); at 45 deg each layer advances
 #                   <= half a line width, so the ramp is float-free
+flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
+#                 enough to anchor tall prints on slick beds, snaps off
+#                 with pliers after printing
 joint_screw_d = 4.7  # M4 clearance through boot + base; 4.5 printed undersize
 #                     and oval (FDM hole shrink) — +0.2 keeps the screw free
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
@@ -491,11 +494,13 @@ class Stand:
         attach: str,
         set_angles: list[float],
         tilt: float = TILT,
+        flange_w: float = 0.0,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.tilt = tilt
         self.post_h = post_h
         self.attach = attach
+        self.flange_w = flange_w
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
@@ -870,6 +875,8 @@ class Stand:
                 Plane.YZ * self._wedge(rib_t + 14, rib_h, rad), rib_t
             )
         body += boot
+        if self.flange_w > 0:
+            body += self._breakaway_flange(flush_w)
         body -= joint_grooves()
         body -= joint_nut_pockets()
         # Trims the bottom post flares, which dip below the seat plane at
@@ -887,6 +894,21 @@ class Stand:
             (depth, 0),
             (height * math.sin(rad), height * math.cos(rad)),
             align=None,
+        )
+
+    def _breakaway_flange(self, flush_w: float):
+        """Thin ring around the boot footprint (--flange): bed-adhesion
+        insurance for slick plates. flange_t tall so it snaps off with
+        pliers after printing; added after the lip chamfer cut, so the two
+        never interact, and clear of every joint feature."""
+        outer = RectangleRounded(
+            flush_w + 2 * self.flange_w,
+            boot_rear - boot_front + 2 * self.flange_w,
+            4,
+        )
+        inner = Rectangle(flush_w, boot_rear - boot_front)
+        return Pos(0, (boot_front + boot_rear) / 2, base_t) * extrude(
+            outer - inner, flange_t
         )
 
     # -- top level ------------------------------------------------------------
@@ -969,6 +991,14 @@ def main() -> None:
         help='M4 nut pocket (nut) or self-tapping pilot (tap)',
     )
     ap.add_argument(
+        '--flange',
+        type=float,
+        default=0.0,
+        metavar='W',
+        help='add a breakaway flange around the boot for slick beds: W mm '
+        'out, 0.6 mm thick, snap off after printing (0 = off)',
+    )
+    ap.add_argument(
         '--pcb',
         type=Path,
         default=DEFAULT_PCB,
@@ -999,6 +1029,8 @@ def main() -> None:
     tilts = [float(a) for a in args.tilt.split(',')]
     if len(tilts) < 1:
         sys.exit('error: --tilt needs at least one angle')
+    if not 0 <= args.flange <= 30:
+        sys.exit('error: --flange width must be 0..30 mm')
 
     pcb_w, pcb_h, holes = parse_pcb(args.pcb)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -1032,9 +1064,20 @@ def main() -> None:
         stands, stems = [], []
         for tilt in tilts:
             stands.append(
-                Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles, tilt)
+                Stand(
+                    pcb_w,
+                    pcb_h,
+                    holes,
+                    args.post_h,
+                    args.attach,
+                    set_angles,
+                    tilt,
+                    flange_w=args.flange,
+                )
             )
             tag = f'_t{tilt:g}'
+            if args.flange:
+                tag += f'_flange{args.flange:g}'
             if args.part == 'upright':
                 stems.append(f'stand_{args.side}_upright{tag}')
             elif args.part == 'full':
