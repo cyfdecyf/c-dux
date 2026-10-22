@@ -143,9 +143,10 @@ haunch_d = 18  # full-width haunch: depth along the seat plane
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
-rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
-#            clear every post AND the joint hardware
-rib_h = 60  # rib height up the back face
+rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
+#            clear every post AND the joint hardware; widened 8 -> 12
+#            because the 30/-35 post layout only fits two ribs
+rib_h = 70  # rib height up the back face (was 60)
 pad_d = 20
 pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia,
 #                same baseline as joint_clear)
@@ -184,9 +185,11 @@ key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = -2  # boot front edge — behind the plate front face at the seat
-boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
-#                nut seats get a ~7 mm wall behind them instead of 1.2, and
-#                the wider seat patch adds compression area to the joint
+boot_rear = 34  # boot rear edge: 6 mm past the rib wedge footprints (base
+#                 y = 28) so the ribs keep their 6 mm wall, and ~15 mm of
+#                 wall behind the nut seats; extended 8 mm rearward (was
+#                 26) to put the printed part's CoM back inside the bed
+#                 contact patch (t30/-35 CoM y 29.7 was 3.7 mm outside)
 lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
 #                   lip; 0 disables. Anchored at the plate's seat-plane
 #                   corner (y=0, z=base_t) so the 45 deg face bounds the
@@ -870,10 +873,12 @@ class Stand:
         boot += Pos(-flush_w / 2, boot_front, base_t) * extrude(
             Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), flush_w
         )
-        # Ribs continue up the back face into the hammering zone.
+        # Ribs continue up the back face into the hammering zone. Wedge
+        # base depth rib_t + 18: base reaches y = 28, keeping the 6 mm
+        # wall to the extended boot rear (34).
         for rx in self.rib_x:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 14, rib_h, rad), rib_t
+                Plane.YZ * self._wedge(rib_t + 18, rib_h, rad), rib_t
             )
         body += boot
         if self.flange_w > 0:
