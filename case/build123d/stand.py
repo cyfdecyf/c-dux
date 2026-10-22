@@ -22,7 +22,7 @@ Highlights over the retired OpenSCAD version:
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default 20 deg in-plane rotation = home-row slope), and the backplate
+    default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -37,15 +37,15 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default 20 deg CCW in the front view; negate to
+centroid by --set-angles (default -35 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest corner clears the base top by 2 mm
-(rotation swings a board corner ~14 mm below the nominal edge at 20 deg).
+(rotation swings a board corner below the nominal edge).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
     uv run stand.py --part base              # shared base slab (print once)
-    uv run stand.py --part upright           # left upright, 20 deg recline
+    uv run stand.py --part upright           # left upright, 30 deg recline
     uv run stand.py --side right --part upright
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
     uv run stand.py --part full              # fused assembly preview
@@ -58,10 +58,13 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import itertools
 import math
 import re
 import sys
+import warnings
 
 from pathlib import Path
 
@@ -140,11 +143,19 @@ haunch_d = 18  # full-width haunch: depth along the seat plane
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
-rib_t = 8  # rib thickness (X); rib x-positions are solved automatically to
-#            clear every post AND the joint hardware
-rib_h = 60  # rib height up the back face
+rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
+#            clear every post AND the joint hardware; widened 8 -> 12
+#            because the 30/-35 post layout only fits two ribs
+rib_h = 70  # rib height up the back face (was 60)
 pad_d = 20
-pad_recess = 0.8
+pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia,
+#                same baseline as joint_clear)
+pad_recess = 0.8  # pocket depth ≈ pad thickness, pad face ends up flush
+pad_seat_w = 3.0  # flat seat annulus at full depth; inboard of it the floor
+#                   rises at 45° to a flush center. Face-down, only this 3 mm
+#                   annulus bridges — a full flat floor is a suspended Ø20
+#                   bridge and sagged badly in the first print. The wall +
+#                   seat band keep the pad edge captured so it cannot creep.
 pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              as this allows — the tip-over pivots are the PAD contact lines,
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
@@ -161,8 +172,8 @@ base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 # seated in the boot top — screwing down from the boot ledge would put the
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
-TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             first batch prints the 20° pair only
+TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
+#             current working default: 30 deg with SET_ANGLES [-35]
 joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
@@ -174,16 +185,31 @@ key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = -2  # boot front edge — behind the plate front face at the seat
-boot_rear = 26  # boot rear edge: 6 mm past the rib wedge footprints so the
-#                nut seats get a ~7 mm wall behind them instead of 1.2, and
-#                the wider seat patch adds compression area to the joint
-joint_screw_d = 4.5  # M4 clearance through boot + base
+boot_rear = 34  # boot rear edge: 6 mm past the rib wedge footprints (base
+#                 y = 28) so the ribs keep their 6 mm wall, and ~15 mm of
+#                 wall behind the nut seats; extended 8 mm rearward (was
+#                 26) to put the printed part's CoM back inside the bed
+#                 contact patch (t30/-35 CoM y 29.7 was 3.7 mm outside)
+lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
+#                   lip; 0 disables. Anchored at the plate's seat-plane
+#                   corner (y=0, z=base_t) so the 45 deg face bounds the
+#                   print from layer 1: the raw bottom edge face sweeps
+#                   over the bed at (90 - tilt) from horizontal - in front
+#                   of the boot it printed as a floating ramp (0.55
+#                   mm/layer at 20 deg); at 45 deg each layer advances
+#                   <= half a line width, so the ramp is float-free
+flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
+#                 enough to anchor tall prints on slick beds, snaps off
+#                 with pliers after printing
+joint_screw_d = 4.7  # M4 clearance through boot + base; 4.5 printed undersize
+#                     and oval (FDM hole shrink) — +0.2 keeps the screw free
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
 joint_screw_y = 14.5
 # Screw direction: the nuts live in the BOOT, the screws come up from the
 # open base underside. The first draft drove them down from the boot top,
-# but the reclined plate overhangs that ledge (~48 mm up at 20 deg) and
+# but the reclined plate overhangs that ledge (~48 mm up at 20 deg, more at
+# higher tilts) and
 # leaves no room for a driver; from below the access is unobstructed, and
 # a longer screw costs nothing.
 joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
@@ -203,7 +229,7 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 # default 20 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest corner clears the base top (BASE_TOP_MARGIN).
-SET_ANGLES = [20]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -318,12 +344,30 @@ def joint_screw_bores():
 def joint_screw_head_pockets():
     """Socket-head pockets open at the base underside: the heads must sit
     below the desk face or the base would rock on them, and the driver
-    works from the open bottom anyway."""
+    works from the open bottom anyway.
+
+    The shoulder is a 45° cone (head_pocket_d at head_pocket_h, rising to
+    the clearance bore) rather than a flat annulus: face-down, a flat
+    shoulder prints as a suspended Ø8 bridge — saggy on the exact surface
+    the head clamps against. The cone prints layer-supported and the Ø7
+    head bears on the cone's Ø7 ring; clamp stays axial."""
+    cone_h = (head_pocket_d - joint_screw_d) / 2
+    assert head_pocket_h + cone_h < base_t, (
+        'head pocket + shoulder cone must stay inside base_t'
+    )
     pockets = None
     for sx in (-1, 1):
         pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        pocket += Pos(
+            sx * joint_screw_x, joint_screw_y, head_pocket_h - EPS
+        ) * Cone(
+            head_pocket_d / 2,
+            joint_screw_d / 2,
+            cone_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
         )
         pockets = pocket if pockets is None else pockets + pocket
@@ -435,6 +479,15 @@ def _convex_hull(pts: list[tuple[float, float]]) -> list[tuple[float, float]]:
     return half(pts)[:-1] + half(pts[::-1])[:-1]
 
 
+def _ccw(pts):
+    """Point list normalized to counter-clockwise winding."""
+    area = sum(
+        pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1]
+        for i in range(len(pts))
+    )
+    return pts if area > 0 else pts[::-1]
+
+
 class Stand:
     def __init__(
         self,
@@ -445,11 +498,13 @@ class Stand:
         attach: str,
         set_angles: list[float],
         tilt: float = TILT,
+        flange_w: float = 0.0,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.tilt = tilt
         self.post_h = post_h
         self.attach = attach
+        self.flange_w = flange_w
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
@@ -476,10 +531,33 @@ class Stand:
             pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
         )
         self.plate_w = 2 * self.plate_half
+        # the bottom band stays flush with the base; a post whose keep-box
+        # pokes past the base width keeps a local bulge instead of widening
+        # the whole part
+        self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
+        for sx in (-1, 1):
+            spans = sorted(
+                (y - keep, min(y + keep, self.plate_h))
+                for x, y in self.all_posts
+                if (x > 0) == (sx > 0) and abs(x) + keep > self.bx / 2
+            )
+            merged: list[list[float]] = []
+            for lo, hi in spans:
+                if merged and lo <= merged[-1][1]:
+                    merged[-1][1] = max(merged[-1][1], hi)
+                else:
+                    merged.append([lo, hi])
+            if merged:
+                self.bulges.append((sx, [tuple(m) for m in merged]))
         if self.plate_half > self.bx / 2:
+            spans_txt = ' / '.join(
+                f'side {sx:+d} y '
+                + ', '.join(f'{lo:.0f}..{hi:.0f}' for lo, hi in spans)
+                for sx, spans in self.bulges
+            )
             print(
-                f'warning: mounting set needs plate half-width {self.plate_half:.1f} '
-                f'but the base is only {self.bx / 2:.1f} wide — plate overhangs the base'
+                f'note: bottom band flush with the base ({self.bx:.1f} mm); '
+                f'post bulge(s) kept at {spans_txt}'
             )
         if self.plate_half < joint_screw_x + 5:
             sys.exit(
@@ -626,7 +704,9 @@ class Stand:
         if y0 >= self.plate_h:
             return []
         keep = post_d / 2 + post_edge_margin
-        pts = [(-self.plate_half, y0), (self.plate_half, y0)]
+        # hull bottom corners at the base width: the bottom band is flush;
+        # post keep-boxes past it widen the hull locally (the bulge)
+        pts = [(-self.bx / 2, y0), (self.bx / 2, y0)]
         for x, y in self.all_posts:
             if y + keep <= y0:
                 continue  # post stays inside the full-width band
@@ -651,6 +731,43 @@ class Stand:
             )
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
+        # flush sides: cap the plate at the base width; on a side whose post
+        # keep-box pokes past it, the tab grows out of the flush edge through
+        # tangent quarter-round shoulders (clear of the post keep circle)
+        over = self.plate_half - self.bx / 2
+        for sx in (-1, 1):
+            spans = dict(self.bulges).get(sx, [])
+            x_mid = sx * (self.bx / 2 + over / 2)
+            if not spans:
+                if over > EPS:  # exactly base-flush: nothing past the edge
+                    solid -= Pos(x_mid, self.plate_h / 2, -EPS) * Box(
+                        over, self.plate_h, plate_t + 2 * EPS,
+                        align=(Align.CENTER, Align.CENTER, MIN),
+                    )
+                continue
+            lo0, hi0 = spans[0]
+            x_in, x_out = self.bx / 2, self.plate_half
+            pts = [(x_in, 0.0), (x_in, lo0 - over)]
+            pts += [
+                (x_in + sx * over * math.cos(math.radians(t)), lo0 + over * math.sin(math.radians(t)))
+                for t in range(270 + 15, 361, 15)
+            ]
+            pts += [(x_out, hi0)]
+            pts += [
+                (x_in + sx * over * math.cos(math.radians(t)), hi0 + over * math.sin(math.radians(t)))
+                for t in range(15, 91, 15)
+            ]
+            pts += [(x_in, self.plate_h), (x_out, self.plate_h), (x_out, 0.0)]
+            if sx < 0:
+                pts = [(-x, y) for x, y in reversed(pts)]
+            solid -= Pos(0, 0, -EPS) * extrude(
+                Polygon(*_ccw(pts), align=None), plate_t + 2 * EPS
+            )
+            for (_, hi_a), (_, lo_b) in itertools.pairwise(spans):
+                solid -= Pos(x_mid, (hi_a + lo_b) / 2, -EPS) * Box(
+                    over, lo_b - hi_a, plate_t + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
         for hole in self.all_posts:
             x, y = hole
             solid += Pos(x, y, plate_t) * (
@@ -692,9 +809,24 @@ class Stand:
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
-            base -= Pos(px, py, -EPS) * Cylinder(
-                pad_d / 2, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
+            # Pad pocket: vertical wall at pad_d + 2*pad_fit captures the pad
+            # edge (no creep), pad_seat_w flat annulus is the seat, then a
+            # 45° cone up to the flush center — face-down, only the seat
+            # annulus bridges (the first print's full-flat Ø20 floor sagged).
+            ro = pad_d / 2 + pad_fit
+            ri = ro - pad_seat_w
+            pocket = Pos(px, py, -EPS) * Cylinder(
+                ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
+            ) - Pos(px, py, -EPS) * Cylinder(
+                ri, pad_recess + 3 * EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
+            pocket += Pos(px, py, -EPS) * Cone(
+                ri + EPS,
+                ri - pad_recess,
+                pad_recess + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+            base -= pocket
         base += joint_keys()
         base -= joint_screw_bores() + joint_screw_head_pockets()
         return base
@@ -703,27 +835,54 @@ class Stand:
 
     def upright_solid(self):
         """The demountable half: everything above the seat plane, printed
-        boot-down on the bed, support-free like the old one-piece print."""
+        boot-down on the bed. Exported pose is the print pose; layer-by-layer
+        audits (facets + per-layer float) show no bridging and no air-start
+        once the front lip is chamfered."""
         rad = math.radians(self.tilt)
         body = (
             Pos(0, 0, self.origin_z)
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
+        if lip_chamfer > 0:
+            # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
+            # Applied before the boot union: the cut plane starts at the
+            # plate's seat-plane corner, inside the boot footprint, so the
+            # boot itself is untouched.
+            body -= (
+                Pos(-(self.plate_w + 20) / 2, 0, 0)
+                * extrude(
+                    Plane.YZ
+                    * Polygon(
+                        (0, base_t),
+                        (-lip_chamfer, base_t + lip_chamfer),
+                        (-lip_chamfer, base_t),
+                        align=None,
+                    ),
+                    self.plate_w + 20,
+                )
+            )
+        # boot + haunch stay flush with the base even when the plate keeps a
+        # post bulge further up
+        flush_w = min(self.plate_w, self.bx)
         boot = Pos(0, (boot_front + boot_rear) / 2, base_t + boot_h / 2) * Box(
-            self.plate_w, boot_rear - boot_front, boot_h
+            flush_w, boot_rear - boot_front, boot_h
         )
         # Full-width haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner corner.
-        boot += Pos(-self.plate_w / 2, boot_front, base_t) * extrude(
-            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), self.plate_w
+        boot += Pos(-flush_w / 2, boot_front, base_t) * extrude(
+            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), flush_w
         )
-        # Ribs continue up the back face into the hammering zone.
+        # Ribs continue up the back face into the hammering zone. Wedge
+        # base depth rib_t + 18: base reaches y = 28, keeping the 6 mm
+        # wall to the extended boot rear (34).
         for rx in self.rib_x:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 14, rib_h, rad), rib_t
+                Plane.YZ * self._wedge(rib_t + 18, rib_h, rad), rib_t
             )
         body += boot
+        if self.flange_w > 0:
+            body += self._breakaway_flange(flush_w)
         body -= joint_grooves()
         body -= joint_nut_pockets()
         # Trims the bottom post flares, which dip below the seat plane at
@@ -741,6 +900,21 @@ class Stand:
             (depth, 0),
             (height * math.sin(rad), height * math.cos(rad)),
             align=None,
+        )
+
+    def _breakaway_flange(self, flush_w: float):
+        """Thin ring around the boot footprint (--flange): bed-adhesion
+        insurance for slick plates. flange_t tall so it snaps off with
+        pliers after printing; added after the lip chamfer cut, so the two
+        never interact, and clear of every joint feature."""
+        outer = RectangleRounded(
+            flush_w + 2 * self.flange_w,
+            boot_rear - boot_front + 2 * self.flange_w,
+            4,
+        )
+        inner = Rectangle(flush_w, boot_rear - boot_front)
+        return Pos(0, (boot_front + boot_rear) / 2, base_t) * extrude(
+            outer - inner, flange_t
         )
 
     # -- top level ------------------------------------------------------------
@@ -771,18 +945,29 @@ def summary(name: str, part) -> None:
 
 
 def push_viewer(part, name: str) -> None:
-    """Send the model to the OCP CAD Viewer (VS Code). Best effort, never
-    fatal — exporting must not depend on the viewer running."""
+    """Send the model to the OCP CAD Viewer (VS Code). Best effort: never
+    fatal, never noisy — the library prints (and sometimes swallows) its own
+    connection errors, so its output is captured and condensed into one line
+    when the viewer is closed or half-open."""
+    buf_out, buf_err = io.StringIO(), io.StringIO()
+    exc: Exception | None = None
     try:
-        from ocp_vscode import Camera, show
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            with contextlib.redirect_stdout(buf_out), contextlib.redirect_stderr(buf_err):
+                from ocp_vscode import Camera, show
+
+                show(part, names=[name], reset_camera=Camera.CENTER)
     except ImportError:
         print('note: viewer push skipped — install with: uv add --dev ocp-vscode')
         return
-    try:
-        show(part, names=[name], reset_camera=Camera.CENTER)
+    except Exception as e:
+        exc = e
+    if exc is None and not buf_err.getvalue().strip():
         print(f'pushed to OCP CAD Viewer: {name}')
-    except Exception as exc:
-        print(f'note: viewer push skipped ({type(exc).__name__}: {exc})')
+    else:
+        detail = buf_err.getvalue().strip().splitlines() or [str(exc) or 'unknown error']
+        print(f'note: viewer push skipped ({detail[0][:100]})')
 
 
 def main() -> None:
@@ -810,6 +995,14 @@ def main() -> None:
         choices=['nut', 'tap'],
         default='nut',
         help='M4 nut pocket (nut) or self-tapping pilot (tap)',
+    )
+    ap.add_argument(
+        '--flange',
+        type=float,
+        default=0.0,
+        metavar='W',
+        help='add a breakaway flange around the boot for slick beds: W mm '
+        'out, 0.6 mm thick, snap off after printing (0 = off)',
     )
     ap.add_argument(
         '--pcb',
@@ -842,6 +1035,8 @@ def main() -> None:
     tilts = [float(a) for a in args.tilt.split(',')]
     if len(tilts) < 1:
         sys.exit('error: --tilt needs at least one angle')
+    if not 0 <= args.flange <= 30:
+        sys.exit('error: --flange width must be 0..30 mm')
 
     pcb_w, pcb_h, holes = parse_pcb(args.pcb)
     args.out.mkdir(parents=True, exist_ok=True)
@@ -858,7 +1053,6 @@ def main() -> None:
             step = args.out / f'{stem}.step'
             export_step(part, step)
             print(f'          {step}')
-        push_viewer(part, stem)
 
     if args.part == 'joint':
         emit(joint_coupon_base(), 'joint_coupon_base')
@@ -876,9 +1070,20 @@ def main() -> None:
         stands, stems = [], []
         for tilt in tilts:
             stands.append(
-                Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles, tilt)
+                Stand(
+                    pcb_w,
+                    pcb_h,
+                    holes,
+                    args.post_h,
+                    args.attach,
+                    set_angles,
+                    tilt,
+                    flange_w=args.flange,
+                )
             )
             tag = f'_t{tilt:g}'
+            if args.flange:
+                tag += f'_flange{args.flange:g}'
             if args.part == 'upright':
                 stems.append(f'stand_{args.side}_upright{tag}')
             elif args.part == 'full':
