@@ -22,7 +22,7 @@ Highlights over the retired OpenSCAD version:
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default 20 deg in-plane rotation = home-row slope), and the backplate
+    default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -37,15 +37,15 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default 20 deg CCW in the front view; negate to
+centroid by --set-angles (default -35 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest corner clears the base top by 2 mm
-(rotation swings a board corner ~14 mm below the nominal edge at 20 deg).
+(rotation swings a board corner below the nominal edge).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
     uv run stand.py --part base              # shared base slab (print once)
-    uv run stand.py --part upright           # left upright, 20 deg recline
+    uv run stand.py --part upright           # left upright, 30 deg recline
     uv run stand.py --side right --part upright
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
     uv run stand.py --part full              # fused assembly preview
@@ -171,8 +171,8 @@ base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 # seated in the boot top — screwing down from the boot ledge would put the
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
-TILT = 20.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             first batch prints the 20° pair only
+TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
+#             current working default: 30 deg with SET_ANGLES [-35]
 joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
@@ -205,7 +205,8 @@ joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 joint_screw_y = 14.5
 # Screw direction: the nuts live in the BOOT, the screws come up from the
 # open base underside. The first draft drove them down from the boot top,
-# but the reclined plate overhangs that ledge (~48 mm up at 20 deg) and
+# but the reclined plate overhangs that ledge (~48 mm up at 20 deg, more at
+# higher tilts) and
 # leaves no room for a driver; from below the access is unobstructed, and
 # a longer screw costs nothing.
 joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
@@ -225,7 +226,7 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 # default 20 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest corner clears the base top (BASE_TOP_MARGIN).
-SET_ANGLES = [20]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
