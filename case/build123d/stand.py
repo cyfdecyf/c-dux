@@ -201,8 +201,9 @@ lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
 flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
 #                 enough to anchor tall prints on slick beds, snaps off
 #                 with pliers after printing
-joint_screw_d = 4.7  # M4 clearance through boot + base; 4.5 printed undersize
-#                     and oval (FDM hole shrink) — +0.2 keeps the screw free
+joint_screw_d = 4.5  # M4 clearance through boot + base — the printed and
+#                     assembled reference; 31bef39's +0.2 oversize never
+#                     printed and was reverted with the rest of it
 joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
 #                    clear the keys and the ribs (see the rib keep-outs)
 joint_screw_y = 14.5
@@ -349,28 +350,17 @@ def joint_screw_head_pockets():
     below the desk face or the base would rock on them, and the driver
     works from the open bottom anyway.
 
-    The shoulder is a 45° cone (head_pocket_d at head_pocket_h, rising to
-    the clearance bore) rather than a flat annulus: face-down, a flat
-    shoulder prints as a suspended Ø8 bridge — saggy on the exact surface
-    the head clamps against. The cone prints layer-supported and the Ø7
-    head bears on the cone's Ø7 ring; clamp stays axial."""
-    cone_h = (head_pocket_d - joint_screw_d) / 2
-    assert head_pocket_h + cone_h < base_t, (
-        'head pocket + shoulder cone must stay inside base_t'
-    )
+    Flat annulus shoulder, the printed-and-assembled reference: face-down
+    it is a ring bridge (Ø8 to the Ø4.5 bore, ~1.75 mm wide) that printed
+    fine and seats the head parallel to the desk. 31bef39's 45° cone
+    shoulder never printed; reverted with the rest of that commit's
+    unprinted tweaks. Minor stringing inside the pocket is a slicer
+    matter — see the README print tips."""
     pockets = None
     for sx in (-1, 1):
         pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
-            align=(Align.CENTER, Align.CENTER, MIN),
-        )
-        pocket += Pos(
-            sx * joint_screw_x, joint_screw_y, head_pocket_h - EPS
-        ) * Cone(
-            head_pocket_d / 2,
-            joint_screw_d / 2,
-            cone_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
         )
         pockets = pocket if pockets is None else pockets + pocket
