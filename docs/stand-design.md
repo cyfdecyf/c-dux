@@ -139,9 +139,9 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 
 ### 6.2 `base_solid`(世界系)
 
-底板 → 竖直边圆角 10 → 顶面周边圆角 2 → 6 个胶垫凹槽(立壁卡缘 +
-3 mm 环形座面 + 45° 锥底,面朝下打印只有 3 mm 环形桥)→ 并榫键 →
-减螺钉通孔与沉头孔。
+底板 → 竖直边圆角 10 → 顶面周边圆角 2 → 6 个胶垫凹槽(卡缘 + 全深
+平底,中部 1 mm 减胶槽把顶面拆成两个小桥;1 mm 胶垫高出底面 0.4)
+→ 并榫键 → 减螺钉通孔与沉头孔。
 
 ### 6.3 `upright_solid`(世界系,顺序即打印姿态自上而下的层积)
 
@@ -166,7 +166,10 @@ flange_t、lip_chamfer、pad_*`。
 `joint_clear = 0.4`(FDM 公差基线)、`boot_nut_clear = 3.6`(抗蠕变承压)、
 `nut_mouth_af = 6.9`(对螺母 7.0 的六角过盈收口,与沉孔同取向)、`joint_screw_d = 4.5`(实印
 基准)、`MIN_POST_CENTER = 13`、`BASE_TOP_MARGIN = 2`、`key_h = 3.2 <
-boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`。
+boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`;胶垫
+凹槽 `pad_recess = pad_t − pad_protrude = 0.6`(按 1 mm 胶垫留 0.4
+凸出,垫独占桌面接触)、`pad_slot_w/d = 1`(减胶槽,两处 3 mm 粘接
+平台断开,防中心盘顶面孤岛)。
 
 ## 8. 不变量清单(改代码前必读)
 

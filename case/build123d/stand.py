@@ -150,16 +150,28 @@ rib_h = 70  # rib height up the back face (was 60)
 pad_d = 20
 pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia,
 #                same baseline as joint_clear)
-pad_recess = 0.8  # pocket depth ≈ pad thickness, pad face ends up flush
-pad_seat_w = 3.0  # flat seat annulus at full depth; inboard of it the floor
-#                   rises at 45° to a flush center. Face-down, only this 3 mm
-#                   annulus bridges — a full flat floor is a suspended Ø20
-#                   bridge and sagged badly in the first print. The wall +
-#                   seat band keep the pad edge captured so it cannot creep.
+pad_t = 1.0  # purchased self-adhesive TPU pad thickness
+pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
+#                     desk contact (the tip-over pivots) across die-cut
+#                     thickness tolerance — TPU compression at keyboard
+#                     loads is microns, the tolerance is the driver
+pad_recess = pad_t - pad_protrude  # 0.6 pocket depth
+pad_seat_w = 4.0  # slot-centerline radius inside the capture wall: the
+#                   glue floor runs from the wall in to the relief slot
+pad_slot_w = 1.0  # relief slot between seat ring and center disk: splits
+#                   the print-time ceiling into two small arc bridges (the
+#                   full-flat floor sagged badly in the first print). The
+#                   TPU pad spans the 1-mm slot, so the whole pocket floor
+#                   stays flat adhesive area — no crest pokes into it.
+pad_slot_d = 1.0  # slot depth: 0.4 above the floor; its 1-mm-wide roof
+#                   bridge hides under the pad
+pad_slot_land = 3.0  # two glue lands interrupt the slot (at ±y of each
+#                      pad): they anchor the center disk to the seat ring,
+#                      so its ceiling cannot air-start as an island
 pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              as this allows — the tip-over pivots are the PAD contact lines,
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
-#              stability; 2 mm still leaves the 0.8 mm recess fully on flat)
+#              stability; 2 mm still leaves the 0.6 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 
 # --- base ↔ upright joint -------------------------------------------------------
@@ -801,10 +813,13 @@ class Stand:
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
-            # Pad pocket: vertical wall at pad_d + 2*pad_fit captures the pad
-            # edge (no creep), pad_seat_w flat annulus is the seat, then a
-            # 45° cone up to the flush center — face-down, only the seat
-            # annulus bridges (the first print's full-flat Ø20 floor sagged).
+            # Pad pocket: capture wall at pad_d + 2*pad_fit, then a flat
+            # glue floor one pad_recess deep — the pad bottoms flat, so
+            # everything inside the wall is adhesive area. The relief slot
+            # splits the print-time ceiling into two small arc bridges (a
+            # full-flat floor sagged badly in the first print); two glue
+            # lands anchor the center disk so nothing starts in air. The
+            # pad spans slot and lands alike.
             ro = pad_d / 2 + pad_fit
             ri = ro - pad_seat_w
             pocket = Pos(px, py, -EPS) * Cylinder(
@@ -812,12 +827,30 @@ class Stand:
             ) - Pos(px, py, -EPS) * Cylinder(
                 ri, pad_recess + 3 * EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
-            pocket += Pos(px, py, -EPS) * Cone(
-                ri + EPS,
-                ri - pad_recess,
-                pad_recess + EPS,
+            pocket += Pos(px, py, -EPS) * Cylinder(
+                ri - pad_slot_w / 2,
+                pad_recess + 2 * EPS,
                 align=(Align.CENTER, Align.CENTER, MIN),
             )
+            pocket += Pos(px, py, -EPS) * (
+                Cylinder(
+                    ri + pad_slot_w / 2,
+                    pad_slot_d + EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
+                - Cylinder(
+                    ri - pad_slot_w / 2,
+                    pad_slot_d + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
+            )
+            for sy in (-1, 1):
+                pocket -= Pos(px, py + sy * ri, -EPS) * Box(
+                    pad_slot_land,
+                    pad_slot_w + 0.4,
+                    pad_slot_d + 3 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
             base -= pocket
         base += joint_keys()
         base -= joint_screw_bores() + joint_screw_head_pockets()
