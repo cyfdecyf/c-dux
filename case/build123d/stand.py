@@ -77,6 +77,7 @@ from build123d import (
     Align,
     Axis,
     Box,
+    CenterOf,
     Cone,
     Cylinder,
     Plane,
@@ -149,7 +150,8 @@ base_side = 10  # lateral margin past the PCB: 10 makes the base (132.5 mm)
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
-haunch_d = 18  # full-width haunch: depth along the seat plane
+haunch_d = 12  # full-width haunch: depth along the seat plane (was 18;
+#               slimmed after the first print — 4-perimeter walls suffice)
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
@@ -207,11 +209,11 @@ key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = -2  # boot front edge — behind the plate front face at the seat
-boot_rear = 34  # boot rear edge: 6 mm past the rib wedge footprints (base
-#                 y = 28) so the ribs keep their 6 mm wall, and ~15 mm of
-#                 wall behind the nut seats; extended 8 mm rearward (was
-#                 26) to put the printed part's CoM back inside the bed
-#                 contact patch (t30/-35 CoM y 29.7 was 3.7 mm outside)
+boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
+#                 rear in __init__ from three floors — wall behind the nut
+#                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
+#                 free-standing CoM margin — and extends rearward past this
+#                 default whenever the measured CoM demands it
 lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
 #                   lip; 0 disables. Anchored at the plate's seat-plane
 #                   corner (y=0, z=base_t) so the 45 deg face bounds the
@@ -582,6 +584,26 @@ class Stand:
         if len(self.rib_x) < 3:
             print(f'warning: only {len(self.rib_x)} ribs fit around the post sets')
         self.haunch_h = self._cap_haunch()
+        # Boot rear edge, derived per instance (module constant = floor we
+        # never shrink below). Hard floors first: wall behind the nut seats,
+        # 6 mm of boot behind the slimmed rib feet. Free-standing (the CoM
+        # projection must keep 8 mm to the rear edge) needs the CoM, and the
+        # CoM needs the boot — chicken and egg, so measure on a provisional
+        # build, extend rearward until the margin holds, round UP to even mm,
+        # and rebuild once. The final CoM is kept for the per-export report.
+        self.boot_rear = math.ceil(
+            max(
+                boot_rear,  # verified default: don't go slimmer than it
+                joint_screw_y + nut_pocket_ac / 2 + 1.5,  # nut-pocket wall
+                boot_front + (rib_t + 8) + 6,  # rib wall on the boot
+            )
+            / 2
+        ) * 2  # even mm
+        body = self.upright_solid()  # provisional pass (floors only)
+        self.boot_rear = math.ceil(
+            max(self.boot_rear, body.center(CenterOf.MASS).Y + 8.0) / 2
+        ) * 2
+        self.com_y = self.upright_solid().center(CenterOf.MASS).Y
 
     # -- rotation-set layout solver ------------------------------------------
 
@@ -930,8 +952,8 @@ class Stand:
         # boot + haunch stay flush with the base even when the plate keeps a
         # post bulge further up
         flush_w = min(self.plate_w, self.bx)
-        boot = Pos(0, (boot_front + boot_rear) / 2, base_t + boot_h / 2) * Box(
-            flush_w, boot_rear - boot_front, boot_h
+        boot = Pos(0, (boot_front + self.boot_rear) / 2, base_t + boot_h / 2) * Box(
+            flush_w, self.boot_rear - boot_front, boot_h
         )
         # Full-width haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner corner.
@@ -939,11 +961,12 @@ class Stand:
             Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), flush_w
         )
         # Ribs continue up the back face into the hammering zone. Wedge
-        # base depth rib_t + 18: base reaches y = 28, keeping the 6 mm
-        # wall to the extended boot rear (34).
+        # base depth rib_t + 8 (slimmed from +18 after the first print):
+        # the base reaches y = boot_front + rib_t + 8, and the derived
+        # boot rear keeps a 6 mm wall behind the feet.
         for rx in self.rib_x:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 18, rib_h, rad), rib_t
+                Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
             )
         body += boot
         if self.flange_w > 0:
@@ -974,11 +997,11 @@ class Stand:
         never interact, and clear of every joint feature."""
         outer = RectangleRounded(
             flush_w + 2 * self.flange_w,
-            boot_rear - boot_front + 2 * self.flange_w,
+            self.boot_rear - boot_front + 2 * self.flange_w,
             4,
         )
-        inner = Rectangle(flush_w, boot_rear - boot_front)
-        return Pos(0, (boot_front + boot_rear) / 2, base_t) * extrude(
+        inner = Rectangle(flush_w, self.boot_rear - boot_front)
+        return Pos(0, (boot_front + self.boot_rear) / 2, base_t) * extrude(
             outer - inner, flange_t
         )
 
@@ -1170,6 +1193,11 @@ def main() -> None:
             f'  | haunch_h = {stand.haunch_h:.1f} mm'
             f'  | joint: keys x=±{key_x:g}, screws x=±{joint_screw_x:g} '
             f'({joint_screw} from below)'
+        )
+        print(
+            f'boot: front {boot_front:g}, rear {stand.boot_rear:g} mm'
+            f'  | CoM y {stand.com_y:.1f} mm, rear margin '
+            f'{stand.boot_rear - stand.com_y:.1f} mm'
         )
         emit(stand.build(args.part, args.side), stem)
 
