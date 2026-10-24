@@ -64,7 +64,7 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 | `joint_keys` | 两根榫键 | 30×8×3.2 @ x=±12, y 12..20;顶缘 45° 导入倒角 |
 | `joint_screw_bores` | 底座 Ø4.7 通孔 | @(±58, 14.5) |
 | `joint_screw_head_pockets` | 沉头孔 | 圆柱 + 45° 锥面台肩——面朝下打印时平台肩是悬空桥,锥面逐层自支撑(首版实测教训) |
-| `joint_nut_pockets` | 靴座螺母座 | Ø4.7 让位孔 + 六角沉孔(对边 7.4,深 3.4)+ 收口唇 6.9(<螺母 7.0,压入后常驻) |
+| `joint_nut_pockets` | 靴座螺母座 | Ø4.7 让位孔 + 六角沉孔(对边 7.4,深 3.4)+ 六角收口唇 6.9(<螺母 7.0,压入后常驻;与沉孔同取向,方形孔永远过不了六角螺母) |
 | `joint_grooves` | 靴座底榫槽 | 键 + 0.4 mm 间隙,**贯穿切割**(盲槽顶曾是 8.8 mm 单边桥,改为贯穿) |
 | `_convex_hull` / `_ccw` | 二维凸包 / 环绕向 | 收腰轮廓与凸台多边形用 |
 
@@ -164,7 +164,7 @@ flange_t、lip_chamfer、pad_*`。
 
 **载荷/工艺设计值**(改前先读 README 对应章节,并与实物验证挂钩):
 `joint_clear = 0.4`(FDM 公差基线)、`boot_nut_clear = 3.6`(抗蠕变承压)、
-`nut_mouth_w = 6.9`(对螺母 7.0 的过盈收口)、`joint_screw_d = 4.7`(缩径
+`nut_mouth_af = 6.9`(对螺母 7.0 的六角过盈收口,与沉孔同取向)、`joint_screw_d = 4.7`(缩径
 补偿)、`MIN_POST_CENTER = 13`、`BASE_TOP_MARGIN = 2`、`key_h = 3.2 <
 boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`。
 

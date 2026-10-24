@@ -219,9 +219,12 @@ head_pocket_h = 4.2
 boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
 #                      this pocket floor takes the clamp load — keep it
 #                      chunky, plastic creeps under a sustained bolt load
-nut_mouth_w = 6.9  # nut-pocket mouth pinched below the nut's 7.0 across
-#                   flats: push the nut in past the flexing lip and it
-#                   stays with the upright
+nut_mouth_af = 6.9  # nut-pocket mouth, a hex pinch below the nut's 7.0
+#                    across flats: push the nut in past the flexing lip
+#                    and it stays with the upright. The pinch MUST be a
+#                    hex aligned with the pocket: a square mouth needs a
+#                    ~7.25 side to pass a 7.0 hex nut in-plane, so a
+#                    square opening this size just blocks the nut.
 nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 
 # --- rotation set ---------------------------------------------------------------
@@ -380,6 +383,7 @@ def joint_nut_pockets():
     headroom, and a pinched mouth at the boot top so the nut snaps in and
     stays with the upright — each angle's upright can keep its own pair."""
     hex_r = (nut_af / 2) / math.cos(math.radians(30))
+    mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
     floor = boot_nut_clear  # above the boot bottom
     pockets = None
     for sx in (-1, 1):
@@ -392,11 +396,9 @@ def joint_nut_pockets():
             + Pos(0, 0, floor)
             * extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h)
             + Pos(0, 0, floor + nut_h)
-            * Box(
-                nut_mouth_w,
-                nut_mouth_w,
+            * extrude(
+                RegularPolygon(mouth_r, 6, major_radius=True),
                 boot_h - floor - nut_h + EPS,
-                align=(Align.CENTER, Align.CENTER, MIN),
             )
         )
         pockets = pocket if pockets is None else pockets + pocket
