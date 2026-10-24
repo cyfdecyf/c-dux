@@ -24,6 +24,8 @@ cd ergogen && ergogen .    # 也是 VS Code 默认构建任务（.vscode/tasks.j
 
 ### 底座模型（case/build123d，uv 管理）
 
+**代码级设计文档：[docs/stand-design.md](docs/stand-design.md)** —— 坐标系映射、求解器算法、布尔管线顺序、不变量清单与打印性验证工具；改 stand.py 前先读它。
+
 ```sh
 cd case/build123d
 uv sync                         # 首次；按 uv.lock 建 .venv（build123d 0.11.1）
