@@ -21,6 +21,11 @@ Highlights over the retired OpenSCAD version:
     reprinting only the upright.
   * Junction reinforcement survives the split: the full-width haunch and
     the back-face ribs moved onto the upright's boot.
+  * PCB clamped from the back: solid Ø12 post tops bear the board while
+    each M4 nut sits in a hex pocket opened at the plate's BACK face behind
+    the post (hex pinch mouth — snap the nut in, it stays with the
+    upright). M4x12 screws: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm +
+    3.4 nut.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
@@ -124,6 +129,11 @@ taper_margin = 2  # the full-width band extends this far above the rib tops
 #                  before the outline tapers in to the post columns
 nut_af = 7.4
 nut_h = 3.4
+nut_mouth_h = 1.2  # PCB nut pocket: pinch-lip depth at the plate back face
+nut_pocket_depth = 4.6  # PCB nut pocket depth into the plate: lip + nut_h;
+#                         leaves plate_t - 4.6 = 1.4 mm of front wall that
+#                         the Ø12 post directly buttresses — the nut bears
+#                         on that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
 tap_d = 3.4
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
@@ -507,6 +517,7 @@ class Stand:
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.tilt = tilt
         self.post_h = post_h
+        self.face_z = plate_t + post_h  # PCB seating plane over the back face
         self.attach = attach
         self.flange_w = flange_w
 
@@ -521,13 +532,11 @@ class Stand:
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
         # Height rule (user): the upright only needs to cover, vertically, from
         # the desk up to the topmost screw hole — the plate top edge clears the
-        # topmost post top (nut-pocket opening) by top_rim of world z; the PCB
-        # above the top posts cantilevers on the posts.
+        # topmost solid post top by top_rim of world z; the PCB above the top
+        # posts cantilevers on the posts.
         top_post_y = max(y for _, y in self.all_posts)
         self.plate_h = (
-            top_post_y
-            + (plate_t + self.post_h) * self.st / self.ct
-            + top_rim / self.ct
+            top_post_y + self.face_z * self.st / self.ct + top_rim / self.ct
         )
         # plate must cover every post with room for the radius + wall margin
         keep = post_d / 2 + post_edge_margin
@@ -594,7 +603,11 @@ class Stand:
         ]
         # v' the lowest board corner may reach: the plate back face at that
         # corner must stay BASE_TOP_MARGIN above the base top
-        v_floor = (base_t + BASE_TOP_MARGIN - self.origin_z - 11 * self.st) / self.ct - bottom_ext
+        # face_z = plate_t + post_h: the PCB back rides that far in front of
+        # the plate back face, so a corner's world height gains face_z * st
+        v_floor = (
+            base_t + BASE_TOP_MARGIN - self.origin_z - self.face_z * self.st
+        ) / self.ct - bottom_ext
 
         lifted = []
         for ang in angles:
@@ -645,7 +658,10 @@ class Stand:
         for (ang, lift, pts), s in zip(lifted, best, strict=True):
             r = math.radians(ang)
             vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
-            corner_z = self.origin_z + (bottom_ext + vmin + lift) * self.ct + 11 * self.st
+            corner_z = (
+                self.origin_z + (bottom_ext + vmin + lift) * self.ct
+                + self.face_z * self.st
+            )
             out.append((ang, [(u + s - self.pcb_w / 2, v + bottom_ext) for u, v in pts]))
             meta.append((ang, s, lift, round(corner_z, 2)))
         return out, meta
@@ -681,9 +697,11 @@ class Stand:
 
     def _cap_haunch(self) -> float:
         """Cap the haunch height so its ridge never runs behind a post's
-        screw clearance hole on the plate back face."""
+        back-face hardware: the screw clearance bore and, wider still, the
+        nut pocket mouth (hex ~4.3 mm major radius plus wall, hence 6.5 mm
+        clear of the post center)."""
         min_y = min(y for _, y in self.all_posts)
-        y_top = min_y - 3
+        y_top = min_y - 6.5
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(10.0, min(haunch_h, h))
 
@@ -783,24 +801,46 @@ class Stand:
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
             )
-        top = plate_t + self.post_h
+        top = self.face_z
         for hole in self.all_posts:
             x, y = hole
             if self.attach == 'nut':
-                # Hex pocket open at the post top: drop the M4 nut in, drive
-                # the screw through the PCB into it.
+                # Clamp from the back: the post top stays SOLID and bears the
+                # PCB; the M4 nut lives in a hex pocket opened at the plate's
+                # BACK face, radially inside the post footprint. The screw
+                # (M4x12: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm + 3.4 nut)
+                # comes through the board and pulls the nut against the
+                # 1.4 mm front wall the post directly buttresses — load path
+                # nut -> wall -> post, pure compression, no printed bridge.
+                # The mouth is a hex pinch (nut_mouth_af < nut across flats,
+                # aligned with the pocket hex) so the nut snaps in from the
+                # back and stays with the upright. The screw passes through
+                # the pocket volume; both are cuts, so that is fine.
                 hex_r = (nut_af / 2) / math.cos(math.radians(30))
-                solid -= Pos(x, y, top - nut_h) * extrude(
-                    RegularPolygon(hex_r, 6, major_radius=True), nut_h + EPS
+                mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
+                solid -= Pos(x, y, -EPS) * (
+                    extrude(
+                        RegularPolygon(mouth_r, 6, major_radius=True),
+                        nut_mouth_h + EPS,
+                    )
+                    + Pos(0, 0, nut_mouth_h)
+                    * extrude(
+                        RegularPolygon(hex_r, 6, major_radius=True),
+                        nut_pocket_depth - nut_mouth_h,
+                    )
                 )
-                solid -= Pos(x, y, 0) * Cylinder(
+                # screw clearance: back face through plate + post, out the top
+                solid -= Pos(x, y, -EPS) * Cylinder(
                     screw_d / 2,
-                    top - nut_h + EPS,
+                    top + 2 * EPS,
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
             else:
-                solid -= Pos(x, y, 2) * Cylinder(
-                    tap_d / 2, top - 2, align=(Align.CENTER, Align.CENTER, MIN)
+                # self-tapping pilot: back face through the solid post top
+                solid -= Pos(x, y, -EPS) * Cylinder(
+                    tap_d / 2,
+                    top + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
                 )
         return solid
 
@@ -1013,13 +1053,14 @@ def main() -> None:
         help='comma-separated stand recline angles (deg) for upright/full',
     )
     ap.add_argument(
-        '--post-h', type=float, default=5, help='post height = PCB-to-plate gap'
+        '--post-h', type=float, default=3, help='post height = PCB-to-plate gap'
     )
     ap.add_argument(
         '--attach',
         choices=['nut', 'tap'],
         default='nut',
-        help='M4 nut pocket (nut) or self-tapping pilot (tap)',
+        help='M4 nut snapped into a back-face pocket (nut) or self-tapping '
+        'pilot through the post (tap)',
     )
     ap.add_argument(
         '--flange',

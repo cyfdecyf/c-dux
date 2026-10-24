@@ -72,10 +72,10 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 
 | 成员 | 职责 | 关键点 |
 |---|---|---|
-| `__init__` | 派生量计算 | `plate_h`(高度法则,见 §6 不变量 6)、`plate_half`、`bulges`、`rib_x`、`haunch_h`;`origin_z = base_t` |
+| `__init__` | 派生量计算 | `face_z = plate_t + post_h`(PCB 承托面,求解器高度约束用)、`plate_h`(高度法则,见 §6 不变量 6)、`plate_half`、`bulges`、`rib_x`、`haunch_h`;`origin_z = base_t` |
 | `_solve_sets` | 柱位布局求解 | 见 §5.1 |
 | `_auto_ribs` | 肋位求解 | 见 §5.2 |
-| `_cap_haunch` | 限制托肩楔高度 | 防止楔脊出现在柱螺丝过孔正后方 |
+| `_cap_haunch` | 限制托肩楔高度 | 防止楔脊出现在柱背面螺丝过孔/螺母沉孔口正后方(沉孔口外扩 ~4.3 mm,故取柱心后 6.5 mm) |
 | `_taper_outline` | 收腰轮廓 | 见 §5.3 |
 | `plate_and_posts` | 背板 + 柱(板局部系) | 见 §6.1 |
 | `base_solid` | 底座(世界系) | 见 §6.2 |
@@ -134,8 +134,14 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
    跳过**(零宽 Box 会令 OCP 抛异常——3f09adf 修复的坑);有凸台侧走
    1/4 圆角肩的多边形切割路径;
 4. 柱:`Cylinder(Ø12, post_h)` + 底部 45° 喇叭口(`Ø17→Ø12` × 1.5,自支撑);
-5. `--attach nut`:柱顶六角沉孔(深 3.4,开口朝上)+ Ø4.5 螺丝通孔;
-   `tap`:Ø3.4 自攻底孔。
+   柱顶实心,直接承托 PCB;
+5. `--attach nut`:背面六角螺母沉孔,开口在背板**背面**、径向完全落在
+   Ø12 柱足印内——z 0..1.2 收口唇(对边 6.9,六角取向)、z 1.2..4.6
+   螺母位(对边 7.4 × 深 3.4);总深 4.6,留 1.4 mm 前壁由柱直接支撑,
+   夹紧载荷路径 螺母 → 前壁 → 柱(全程受压,无打印桥接受力)+
+   Ø4.5 螺丝通孔(背面直通到柱顶;穿过沉孔体积无妨,都是切割);螺钉
+   M4×12(夹持 PCB 1.6 + 柱 3 + 壁 1.4 ≈ 6 mm + 螺母 3.4);
+   `tap`:Ø3.4 自攻底孔,同样背面直通到柱顶。
 
 ### 6.2 `base_solid`(世界系)
 
@@ -164,7 +170,10 @@ flange_t、lip_chamfer、pad_*`。
 
 **载荷/工艺设计值**(改前先读 README 对应章节,并与实物验证挂钩):
 `joint_clear = 0.4`(FDM 公差基线)、`boot_nut_clear = 3.6`(抗蠕变承压)、
-`nut_mouth_af = 6.9`(对螺母 7.0 的六角过盈收口,与沉孔同取向)、`joint_screw_d = 4.5`(实印
+`nut_mouth_af = 6.9`(对螺母 7.0 的六角过盈收口,与沉孔同取向,靴座与
+背面 PCB 沉孔共用同一 trick)、`nut_pocket_depth = 4.6` +
+`nut_mouth_h = 1.2`(背面 PCB 螺母沉孔:唇 + 螺母位,留 1.4 mm 前壁由
+柱直接支撑)、`joint_screw_d = 4.5`(实印
 基准)、`MIN_POST_CENTER = 13`、`BASE_TOP_MARGIN = 2`、`key_h = 3.2 <
 boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`;胶垫
 凹槽 `pad_recess = pad_t − pad_protrude = 0.6`(按 1 mm 胶垫留 0.4
