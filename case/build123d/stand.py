@@ -19,9 +19,9 @@ Highlights over the retired OpenSCAD version:
     two shear keys plus 2x M4x12 screws driven up from the open base
     underside into nuts seated in the boot — swapping angles means
     reprinting only the upright.
-  * Junction reinforcement survives the split: the full-width haunch and
-    the back-face ribs moved onto the upright's boot.
-  * PCB clamped from the back: solid Ø12 post tops bear the board while
+  * Junction reinforcement survives the split: the wide haunch and the
+    back-face ribs moved onto the upright's boot.
+  * PCB clamped from the back: solid Ø10 post tops bear the board while
     each M4 nut sits in a hex pocket opened at the plate's BACK face behind
     the post (hex pinch mouth — snap the nut in, it stays with the
     upright). M4x12 screws: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm +
@@ -122,10 +122,12 @@ top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
 plate_r = 8
-post_d = 12
-post_edge_margin = 8  # plate edge beyond a post center: post radius plus
-#                      pocket/wall; also the keep-out used by the taper
-#                      outline (_taper_outline)
+post_d = 10  # solid standoff boss; the Ø4.5 screw bore leaves a 2.75 mm wall
+post_edge_margin = 5  # plate edge beyond a post center: keep = post_d/2 +
+#                      post_edge_margin = 10 still clears the Ø8.6 nut
+#                      pocket + lip on the back face; also the keep-out used
+#                      by the taper outline (_taper_outline) and the
+#                      per-side bottom-band derivation (__init__)
 taper_margin = 2  # the full-width band extends this far above the rib tops
 #                  before the outline tapers in to the post columns
 nut_af = 7.4
@@ -133,7 +135,7 @@ nut_h = 3.4
 nut_mouth_h = 1.2  # PCB nut pocket: pinch-lip depth at the plate back face
 nut_pocket_depth = 4.6  # PCB nut pocket depth into the plate: lip + nut_h;
 #                         leaves plate_t - 4.6 = 1.4 mm of front wall that
-#                         the Ø12 post directly buttresses — the nut bears
+#                         the Ø10 post directly buttresses — the nut bears
 #                         on that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
 tap_d = 3.4
@@ -143,10 +145,11 @@ base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 base_front = 30  # apron towards the user, trimmed for cost: typing loads
 #                 lean on the rear lever arm, the front pads carry little
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
-base_side = 10  # lateral margin past the PCB: 10 makes the base (132.5 mm)
-#                exactly flush with the upright (plate 132.5 wide); the old 16
-#                predates a PCB/plate change and left 6 mm of dead slab per
-#                side — lateral stance rides on the pad spread
+base_side = 10  # lateral margin past the PCB: the base is 132.5 mm wide and
+#                ALREADY PRINTED at that width — it stays the width reference;
+#                the upright sits upright_inset (2 mm) inside it per side.
+#                The old 16 predates a PCB/plate change and left 6 mm of dead
+#                slab per side — lateral stance rides on the pad spread
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -185,6 +188,9 @@ pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
 #              stability; 2 mm still leaves the 0.6 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
+upright_inset = 2  # upright/boot setback per side from the base edge: the
+#                    base's 2 mm top-perimeter fillet means a truly flush
+#                    side would overhang the rounded edge — sit 2 mm inboard
 
 # --- base ↔ upright joint -------------------------------------------------------
 # The stand ships as two printed parts: the base slab (printed once — shared
@@ -258,7 +264,7 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest corner clears the base top (BASE_TOP_MARGIN).
 SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
-MIN_POST_CENTER = 13.0  # post diameter 12 + 1 mm printing clearance
+MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
 PLATE_HALF_BOUND = 72.0  # max post |x| so the plate stays on the base
@@ -546,15 +552,54 @@ class Stand:
             pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
         )
         self.plate_w = 2 * self.plate_half
-        # the bottom band stays flush with the base; a post whose keep-box
-        # pokes past the base width keeps a local bulge instead of widening
-        # the whole part
+        # boot/haunch/rib width: trimmed to upright_inset inside the base per
+        # side (the base's top fillet rules out a truly flush side)
+        self.flush_w = min(self.plate_w, self.bx - 2 * upright_inset)
+        # the guard was really about the BOOT hosting the joint screws
+        if self.flush_w / 2 < joint_screw_x + 5:
+            sys.exit(
+                f'error: joint screws at |x|={joint_screw_x:g} need boot half-width '
+                f'>= {joint_screw_x + 5:g}, got {self.flush_w / 2:.1f} — reduce the '
+                '--set-angles spread'
+            )
+        self.rib_x = self._auto_ribs()
+        if len(self.rib_x) < 3:
+            print(f'warning: only {len(self.rib_x)} ribs fit around the post sets')
+        # per-side bottom-band edges (signed). The printed base slab (bx) is
+        # the width reference; the band sits upright_inset inside it per side.
+        # A side whose post keep-box pokes past that bound keeps the band at
+        # the bound and grows bulge tabs for the overhang; otherwise the band
+        # shrinks to what its outmost post (+2) and rib (+1) need, rounded up
+        # to even mm — no dead slab, and no rib sliver hanging beside the
+        # plate edge.
+        cap = self.bx / 2 - upright_inset
+        self.band_edges: dict[int, float] = {}
+        for sx in (-1, 1):
+            post_need = max(
+                (abs(x) + keep for x, _ in self.all_posts if (x > 0) == (sx > 0)),
+                default=0.0,
+            )
+            rib_need = max(
+                (abs(x) + rib_t / 2 + 1 for x in self.rib_x if (x > 0) == (sx > 0)),
+                default=0.0,
+            )
+            if post_need > cap:
+                edge = min(self.plate_half, max(cap, rib_need))
+            else:
+                edge = min(
+                    self.plate_half, math.ceil(max(post_need + 2, rib_need) / 2) * 2
+                )
+            self.band_edges[sx] = sx * edge
+        self.band_lo = self.band_edges[-1]
+        self.band_hi = self.band_edges[1]
+        # a post whose keep-box pokes past ITS side's band edge keeps a local
+        # bulge tab instead of widening the whole part
         self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
         for sx in (-1, 1):
             spans = sorted(
                 (y - keep, min(y + keep, self.plate_h))
                 for x, y in self.all_posts
-                if (x > 0) == (sx > 0) and abs(x) + keep > self.bx / 2
+                if (x > 0) == (sx > 0) and abs(x) + keep > abs(self.band_edges[sx])
             )
             merged: list[list[float]] = []
             for lo, hi in spans:
@@ -564,25 +609,16 @@ class Stand:
                     merged.append([lo, hi])
             if merged:
                 self.bulges.append((sx, [tuple(m) for m in merged]))
-        if self.plate_half > self.bx / 2:
-            spans_txt = ' / '.join(
-                f'side {sx:+d} y '
-                + ', '.join(f'{lo:.0f}..{hi:.0f}' for lo, hi in spans)
-                for sx, spans in self.bulges
-            )
-            print(
-                f'note: bottom band flush with the base ({self.bx:.1f} mm); '
-                f'post bulge(s) kept at {spans_txt}'
-            )
-        if self.plate_half < joint_screw_x + 5:
-            sys.exit(
-                f'error: joint screws at |x|={joint_screw_x:g} need plate half-width '
-                f'>= {joint_screw_x + 5:g}, got {self.plate_half:.1f} — reduce the '
-                '--set-angles spread'
-            )
-        self.rib_x = self._auto_ribs()
-        if len(self.rib_x) < 3:
-            print(f'warning: only {len(self.rib_x)} ribs fit around the post sets')
+        spans_txt = ' / '.join(
+            f'side {sx:+d} y '
+            + ', '.join(f'{lo:.0f}..{hi:.0f}' for lo, hi in spans)
+            for sx, spans in self.bulges
+        )
+        print(
+            f'note: bottom band x [{self.band_lo:g}, {self.band_hi:g}] mm, '
+            f'plate half {self.plate_half:.2f}'
+            + (f'; post bulge(s) kept at {spans_txt}' if self.bulges else '')
+        )
         self.haunch_h = self._cap_haunch()
         # Boot rear edge, derived per instance (module constant = floor we
         # never shrink below). Hard floors first: wall behind the nut seats,
@@ -748,9 +784,10 @@ class Stand:
         if y0 >= self.plate_h:
             return []
         keep = post_d / 2 + post_edge_margin
-        # hull bottom corners at the base width: the bottom band is flush;
-        # post keep-boxes past it widen the hull locally (the bulge)
-        pts = [(-self.bx / 2, y0), (self.bx / 2, y0)]
+        # hull bottom corners at the per-side band edges: below the taper
+        # start the plate is the (asymmetric) bottom band; post keep-boxes
+        # poking past a band edge widen the hull locally (the bulge)
+        pts = [(self.band_lo, y0), (self.band_hi, y0)]
         for x, y in self.all_posts:
             if y + keep <= y0:
                 continue  # post stays inside the full-width band
@@ -775,22 +812,23 @@ class Stand:
             )
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
-        # flush sides: cap the plate at the base width; on a side whose post
-        # keep-box pokes past it, the tab grows out of the flush edge through
-        # tangent quarter-round shoulders (clear of the post keep circle)
-        over = self.plate_half - self.bx / 2
+        # trim each side back to ITS band edge; on a side whose post keep-box
+        # pokes past it, the tab grows out of the band edge through tangent
+        # quarter-round shoulders (clear of the post keep circle)
         for sx in (-1, 1):
+            edge = abs(self.band_edges[sx])
+            over = self.plate_half - edge
             spans = dict(self.bulges).get(sx, [])
-            x_mid = sx * (self.bx / 2 + over / 2)
+            x_mid = sx * (edge + over / 2)
             if not spans:
-                if over > EPS:  # exactly base-flush: nothing past the edge
+                if over > EPS:  # nothing past the band edge on this side
                     solid -= Pos(x_mid, self.plate_h / 2, -EPS) * Box(
                         over, self.plate_h, plate_t + 2 * EPS,
                         align=(Align.CENTER, Align.CENTER, MIN),
                     )
                 continue
             lo0, hi0 = spans[0]
-            x_in, x_out = self.bx / 2, self.plate_half
+            x_in, x_out = edge, self.plate_half
             pts = [(x_in, 0.0), (x_in, lo0 - over)]
             pts += [
                 (x_in + sx * over * math.cos(math.radians(t)), lo0 + over * math.sin(math.radians(t)))
@@ -949,9 +987,13 @@ class Stand:
                     self.plate_w + 20,
                 )
             )
-        # boot + haunch stay flush with the base even when the plate keeps a
-        # post bulge further up
-        flush_w = min(self.plate_w, self.bx)
+        # boot + haunch + ribs span flush_w: the base width minus
+        # upright_inset per side (the base's 2 mm top fillet rules out a
+        # truly flush side), even where the plate keeps a post bulge further
+        # up. At the joint screws that leaves flush_w/2 - joint_screw_x -
+        # nut_pocket_ac/2 = 1.95 mm of boot wall outboard of each nut seat —
+        # tight, but a solid pocket wall.
+        flush_w = self.flush_w
         boot = Pos(0, (boot_front + self.boot_rear) / 2, base_t + boot_h / 2) * Box(
             flush_w, self.boot_rear - boot_front, boot_h
         )
