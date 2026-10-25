@@ -1030,53 +1030,84 @@ class Stand:
                     over, lo_b - hi_a, plate_t + 2 * EPS,
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
-        # Top-corner trim (user sketch, back view): two straight cuts across
-        # the tapered roof, one per top corner, with a cap over the
-        # top post left between them. Both lines are anchored to layout
-        # values (band edges, post x/y, plate_h), so they track layout
-        # changes; the post-clearance guard below is the tripwire that
-        # fails loudly if a future layout ever walks a nut pocket into one.
-        #   left:  (band_lo, leftmost post keep-box top + 2)
-        #          -> (top post x - 5, plate_h + 1): the low anchor sits
-        #          BELOW the band top on purpose — the line crosses the
-        #          plate's left edge under y0 and trims the band's
-        #          top-left corner, stopping >= 2 mm above the leftmost
-        #          post's keep-box (newest sketch: cut more of the left
-        #          roof) — and ends left of the top post, widening the cap
-        #   right: (top post x + 12, plate_h + 1) -> (band_hi, hi post y + 11.7)
+        # Top-corner trim (user sketch, back view): two SINGLE straight
+        # lines, one per side. Each line is the outward offset of the
+        # segment top-post -> side-post by e = post_d/2 + 4.5 (= 9.5 mm:
+        # the Ø15 flare foot radius 7.5 + 2 mm user clearance — the
+        # boundary passes 9.5 mm from each post center; a first 7 mm
+        # attempt shaved the flare's outer seat flat). From the top post
+        # (H2) one line runs straight to the left post (H4), one to the
+        # right post (H1) — no multi-segment cuts; the cap left between
+        # the lines covers the top post's boss. Anchors derive from the post
+        # layout, so they track layout changes; the post-clearance guard
+        # below is the tripwire that fails loudly if a future layout ever
+        # walks a nut pocket into a line.
         y0 = rib_h / self.ct + taper_margin
         if y0 < self.plate_h:  # only when the roof is actually tapered
-            top_x = max(self.all_posts, key=lambda p: p[1])[0]  # H2: top post
-            hi_y = max(self.all_posts, key=lambda p: p[0])[1]  # H1: outboard
-            keep = post_d / 2 + post_edge_margin
-            left_y = min(self.all_posts, key=lambda p: p[0])[1]
-            cuts = (
-                ('left', (self.band_lo, left_y + keep + 2.0),
-                 (top_x - 5.0, self.plate_h + 1.0)),
-                ('right', (top_x + 12.0, self.plate_h + 1.0),
-                 (self.band_hi, hi_y + 11.7)),
+            top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
+            sides = {
+                'left': min(self.all_posts, key=lambda p: p[0]),   # H4
+                'right': max(self.all_posts, key=lambda p: p[0]),  # H1
+            }
+            e = post_d / 2 + 4.5  # Ø15 flare foot radius 7.5 + 2 mm user
+            # clearance; the first 7 mm offset shaved the flare's outer
+            # seat flat (user-flagged)
+            cuts: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+            normals: dict[str, tuple[float, float]] = {}
+            for name, side in sides.items():
+                dx, dy = side[0] - top[0], side[1] - top[1]
+                ln = math.hypot(dx, dy)
+                # outward unit normal: the perpendicular of top->side that
+                # points AWAY from the boot centre (band_mid, y0)
+                nx, ny = -dy / ln, dx / ln
+                if nx * (side[0] - self.band_mid) + ny * (side[1] - y0) < 0:
+                    nx, ny = -nx, -ny
+                normals[name] = (nx, ny)
+                cuts[name] = (
+                    (top[0] + e * nx, top[1] + e * ny),
+                    (side[0] + e * nx, side[1] + e * ny),
+                )
+            assert all(
+                math.isfinite(v) for a, b in cuts.values() for v in a + b
+            ), 'top-corner cut line anchors are not finite'
+            # The two lines must keep a >= 8 mm gap where the top post's
+            # boss tops out, so the boss stays covered (t30/-35: ~10.0 mm;
+            # the lines close at y ~121.1 — above the boss top 116.7, just
+            # under the taper hull top). Measured at the boss top, not
+            # plate_h: with e = 7 on both sides the wedge can close before
+            # the plate top on layouts whose side post hangs low. The old
+            # keep-box anchor asserts are gone on purpose: the boundary now
+            # INTENTIONALLY passes 2 mm outside the bosses, which is inside
+            # the old keep-box margin — the 6.5 mm post guard below is the
+            # only protection.
+            boss_top_y = top[1] + post_d / 2
+            cap_edges = {
+                name: a[0] + (boss_top_y - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+                for name, (a, b) in cuts.items()
+            }
+            cap_w = cap_edges['right'] - cap_edges['left']
+            assert cap_w >= 8.0, (
+                f'top-corner cuts leave only {cap_w:.2f} mm of cap at the '
+                "top post's boss top — the boss would not stay covered"
             )
-            # The left line's low anchor dips below y0 BY DESIGN (it trims
-            # the band's top-left corner) — lock it at/above the leftmost
-            # post's keep-box top + 2 mm so bore/pocket (which stay inside
-            # the keep-box) can never be touched. The left line's top
-            # anchor and the right line's band-side anchor must still sit
-            # above the full-width band.
-            assert cuts[0][1][1] >= left_y + keep + 2.0, (
-                'left top-corner cut anchors inside the leftmost '
-                "post's keep-box"
+            listing = '; '.join(
+                f'{name} ({a[0]:g},{a[1]:g})->({b[0]:g},{b[1]:g})'
+                for name, (a, b) in cuts.items()
             )
-            assert cuts[0][2][1] > y0 and cuts[1][2][1] > y0, (
-                'top-corner cut line dips into the full-width band'
+            print(
+                f'note: top-corner cuts 2 mm outside the post bosses: '
+                f'{listing} | cap at boss top {cap_w:.1f} mm'
             )
             # GUARD: the cuts intentionally pass closer to the posts than
             # the taper's 10 mm keep, but a back-face nut pocket must never
             # be clipped: every post center keeps >= 6.5 mm to both lines
             # (pocket across-corner radius 4.27 + pinch lip + wall margin,
-            # the figure the haunch cap uses). A layout change that violates
-            # this must fail loudly, not silently shave a pocket.
+            # the figure the haunch cap uses). The top/side posts sit at
+            # exactly e = 7.0 mm on their own side's line — that is the
+            # design, not a violation. A layout change that violates this
+            # must fail loudly, not silently shave a pocket.
             cut_guard = 6.5
-            for name, a, b in cuts:
+            for name, (a, b) in cuts.items():
                 ux, uy = b[0] - a[0], b[1] - a[1]
                 ln = math.hypot(ux, uy)
                 dists = [
@@ -1095,10 +1126,18 @@ class Stand:
                         f'distances: {listing}'
                     )
             # through-thickness polygon extrusions, same EPS style as the
-            # taper cutter; corners stay sharp (per sketch)
+            # taper cutter; corners stay sharp (per sketch).
+            # _half_plane_cutter removes everything LEFT of a->b: flip a
+            # line whose outward normal points RIGHT of a->b, so each cut
+            # always removes the OUTWARD side (left line -> upper-left,
+            # right line -> upper-right, same semantics as ever).
             ext = 20.0
             x_lo, x_hi = -self.plate_half - ext, self.plate_half + ext
-            for _, a, b in cuts:
+            for name, (a, b) in cuts.items():
+                nx, ny = normals[name]
+                ux, uy = b[0] - a[0], b[1] - a[1]
+                if -uy * nx + ux * ny < 0:  # outward = right of a->b
+                    a, b = b, a
                 solid -= Pos(0, 0, -EPS) * extrude(
                     _half_plane_cutter(a, b, x_lo, x_hi, 0.0, self.plate_h + ext),
                     plate_t + 2 * EPS,
