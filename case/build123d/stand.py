@@ -229,14 +229,15 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-boot_front = 4.5  # boot front edge, 4.5 mm behind the seat origin: the front
-#                   lip is gone entirely (the plate's 45° chamfered lip is
-#                   self-supporting, so the boot never needed to underlie
-#                   it). ONLY the boot box tracks this constant now — the
-#                   reinforcement wedges anchor to the back face instead
-#                   (see _wedge), so recessing the front can no longer
-#                   detach them; the lowest post's pilot exit is wrapped
-#                   by the haunch toe and re-cut through it (extra bite)
+boot_front = 0  # boot front edge flush with the plate's back face at the
+#                seat: no front lip AND no step — the plate's back face
+#                meets the boot front continuously (the old +4.5 recess
+#                left a triangular sliver gap/step at the junction). Only
+#                the boot box tracks this constant — the reinforcement
+#                wedges anchor to the back face instead (see _wedge), so
+#                moving the front cannot detach them; the lowest post's
+#                pilot exit is buried in boot/toe plastic and re-cut
+#                through it (extra bite for the self-tapper)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
