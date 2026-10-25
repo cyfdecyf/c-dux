@@ -367,7 +367,13 @@ post_h(CLI)、flange_t、pad_*`。`keyboard_drop = 30` 特殊:
 底座顶面平直区内、避开周边 2 mm 圆角;立板底带钳制到靴座足迹、与其
 齐平;对称内缩故 boot_mid == band_mid)、
 `MIN_POST_CENTER = 11`、`BASE_TOP_MARGIN = 2`、`key_h = 3.2 <
-boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`;胶垫
+boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`、
+`base_front = 25` / `base_rear = 85`(进深 110;抗后倾按“下移前布局”
+定尺:100 是 keyboard_drop 之前手拍的,下移 30 后最坏接触高度
+h ~170 → ~144 mm,等价老足迹 +20% 裕度,收到 85 后最坏工况持平
+(150 g 键盘、键帽顶水平推力:1.35 vs 1.40 N);静态质心投影 y ≈ 22,
+离后垫线 83 尚有 ~61 mm;再缩下限 y1 ≈ 56——再小后垫圈钻到靴座
+足迹下面);胶垫
 凹槽 `pad_recess = pad_t − pad_protrude = 0.6`(按 1 mm 胶垫留 0.4
 凸出,垫独占桌面接触;新增 `pad_ring_w` = 5 胶合环宽、`pad_relief` =
 1.0 中腔让位深,两级平底见 §6.2;曾加减胶槽 + 过桥凸台防顶面下垂,

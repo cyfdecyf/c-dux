@@ -167,9 +167,17 @@ tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 #            for walls around the (since deleted) coin slots; 6 is plenty
 #            for a flat slab and drops the keyboard 2 mm
-base_front = 30  # apron towards the user, trimmed for cost: typing loads
+base_front = 25  # apron towards the user, trimmed for cost: typing loads
 #                 lean on the rear lever arm, the front pads carry little
-base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
+#                 (forward tip lever 45 mm covers occasional pull/bump only)
+base_rear = 85  # rearward depth on the tilt side: the tip-over lever arm.
+#                Sized against the PRE-drop layout (base_rear 100 was picked
+#                before keyboard_drop existed): the keyboard sitting ~29 mm
+#                lower cut the worst-case lever h ~170 -> ~144 mm, i.e. +20%
+#                tip margin at the old footprint — 85 keeps the old margin
+#                (worst-case horizontal push at the keycap top, ~150 g board:
+#                1.35 vs 1.40 N). Floor: rear pads reach y1-22; below y1 ~ 56
+#                they slide under the boot footprint.
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
