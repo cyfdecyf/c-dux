@@ -33,12 +33,12 @@ Highlights over the retired OpenSCAD version:
     board; the lowest post is self-tapped instead (Ø tap_d pilot straight
     through post + plate — after the drop its back-face pocket would sit
     inside the boot's z-band with no insertion access, and a tapped hole
-    needs none). It also gets no Ø15 flare: at this drop the flare foot
-    would overhang the plate's bottom edge and be clipped into a lump —
-    a plain Ø10 wall prints fine. The haunch toe now wraps the pilot's
+    needs none). Its Ø15 flare dips past the plate's bottom edge and now
+    prints on the boot's coplanar front face (the buried lip), so all four
+    posts carry the same flare. The haunch toe now wraps the pilot's
     rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default -35 deg in-plane rotation = home-row slope), and the backplate
+    default -40 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -140,8 +140,8 @@ keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
-# none. It also gets no Ø15 flare: at this drop the flare foot would
-# overhang the plate's bottom edge and be clipped into a lump
+# none. Its Ø15 flare dips past the plate edge but prints on the boot's
+# coplanar front face (flare_supported)
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -935,6 +935,20 @@ class Stand:
                 f'[{self.boot_lo:g}, {self.boot_hi:g}]')
         return sorted(set(ribs))
 
+    def flare_supported(self, hole: tuple[float, float]) -> bool:
+        """A Ø15 flare foot prints only where the substrate under it is
+        continuous: the plate front face — or, for a ring dipping past the
+        plate's bottom edge, the boot's front face, which is coplanar with
+        it (the buried lip) and x-extruded across the boot span. Outside
+        that span the dipping ring would print over air, so the post falls
+        back to a plain Ø10 wall."""
+        x, y = hole
+        flare_r = post_d / 2 + 2.5
+        if y >= flare_r:
+            return True  # ring fully on the plate
+        w = math.sqrt(flare_r**2 - y**2)
+        return self.boot_lo <= x - w and x + w <= self.boot_hi
+
     def _cap_haunch(self) -> float:
         """Cap the haunch height so its ridge never runs behind a mounted
         post's back-face hardware: the screw clearance bore and, wider still, the
@@ -1185,14 +1199,15 @@ class Stand:
             post = Pos(x, y, plate_t) * Cylinder(
                 post_d / 2, self.post_h, align=(Align.CENTER, Align.CENTER, MIN)
             )
-            if hole != self.lowest_post:
+            if hole != self.lowest_post or self.flare_supported(hole):
                 # 45 deg flare (Ø15 foot ring) where the standoff meets the
-                # plate: adhesion-friendly transition, self-supporting. The
-                # lowest post stays a plain cylinder: it is self-tapped
-                # anyway, and at this drop its flare foot would overhang the
-                # plate's bottom edge (center y ~ 5.6, foot to y ~ -1.9) and
-                # get clipped into a half-trumpet lump by the y >= 0 clip
-                # below; a plain Ø10 cylinder wall prints fine.
+                # plate: adhesion-friendly transition, self-supporting.
+                # Restored for the lowest post too (user): its ring dips
+                # past the plate's bottom edge, and there it prints on the
+                # boot's front face — coplanar with the plate front since
+                # the buried lip. Only a hypothetical layout whose dipping
+                # ring would leave the boot's x-span falls back to a plain
+                # cylinder (as the lowest post used to be).
                 post += Pos(x, y, plate_t) * Cone(
                     post_d / 2 + 2.5,
                     post_d / 2,
@@ -1200,21 +1215,6 @@ class Stand:
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
             solid += post
-        # Flare clip: a deep pattern can park a post's Ø15 flare foot past
-        # the plate's bottom edge (t30/-35 at drop 30: the lowest post
-        # centers at y ~ 5.6, its flare would reach y ~ -1.9 — that post
-        # gets no flare at all now, see above, so this only backstops other
-        # layouts/tilts). The plate itself already spans y >= 0, so
-        # intersect the finished solid with a generous y >= 0 box: any
-        # overhanging flare is trimmed flush with the plate's bottom edge —
-        # a straight vertical clip face, printable; the post top's bearing
-        # area is untouched.
-        solid &= Pos(-self.plate_half - 20, 0, -20) * Box(
-            self.plate_w + 40,
-            self.plate_h + 20,
-            plate_t + self.post_h + 40,
-            align=(Align.MIN, Align.MIN, Align.MIN),
-        )
         top = self.face_z
         for hole in self.all_posts:
             x, y = hole
