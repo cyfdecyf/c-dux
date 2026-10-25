@@ -21,10 +21,13 @@ Highlights over the retired OpenSCAD version:
     reprinting only the upright.
   * Junction reinforcement survives the split: the wide haunch and the
     back-face ribs moved onto the upright's boot.
-  * PCB clamped from the back: solid Ø10 post tops bear the board while
-    each M4 nut sits in a hex pocket opened at the plate's BACK face behind
-    the post (hex pinch mouth — snap the nut in, it stays with the
-    upright). M4x12 screws: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm +
+  * PCB clamped by 3 screws: solid Ø10 post tops bear the board (all 4 of
+    them — typing loads are compression into the post tops) while each M4
+    nut sits in a hex pocket opened at the plate's BACK face behind its
+    post (hex pinch mouth — snap the nut in, it stays with the upright).
+    The lowest post is a plain bearing post (mount_lowest_screw = False):
+    no bore, no pocket, which frees the pattern to drop to the outline
+    floor. M4x12 screws: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm +
     3.4 nut.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default -35 deg in-plane rotation = home-row slope), and the backplate
@@ -120,11 +123,16 @@ plate_margin = 10
 bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  v_floor keeps the board's lowest outline point clear of
 #                  the base top, and keyboard_drop eats most of that margin
-keyboard_drop = 20.0  # whole mounting pattern shifted DOWN the plate by this
-# much (user asked for "键盘下移 3cm"; capped at 20 so the lowest post's
-# back-face nut pocket — mouth plus the nut's swing during insertion, and
-# the M4x12 tip that protrudes 2.6 mm — clears the boot top by >= 1.3 mm
-# and the nut inserts from open air; 28 buried the pocket in the boot)
+keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
+# much (user asked for "键盘下移 3cm"; the real-outline height floor auto-
+# caps the NET drop at ~29.1 mm — the solver lifts the pattern just enough
+# to hold the 2 mm base-top margin: printed lowest PCB outline point
+# z = 8.00, lift ~0.9. The old 20 cap guarded the lowest post's back-face
+# nut pocket vs the boot top; mount_lowest_screw = False removes it)
+mount_lowest_screw = False  # lowest post is a plain bearing post (no bore,
+# no pocket): 3 screws clamp the board, typing loads are compression into
+# all 4 post tops; dropping the lowest screw removes the pocket-vs-boot
+# constraint so the pattern can drop to the outline floor
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -601,6 +609,17 @@ class Stand:
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
+        # Hardware-bearing posts: with mount_lowest_screw = False the lowest
+        # post carries no bore/pocket — a plain bearing point (typing loads
+        # are compression into all 4 post tops; only clamping is 3 screws).
+        # Board geometry (taper hull, bulges, band edges, posts themselves)
+        # keeps using all_posts.
+        self.lowest_post = min(self.all_posts, key=lambda p: p[1])
+        self.mounted_posts = (
+            self.all_posts
+            if mount_lowest_screw
+            else [p for p in self.all_posts if p != self.lowest_post]
+        )
         # Height rule (user): the upright only needs to cover, vertically, from
         # the desk up to the topmost screw hole — the plate top edge clears the
         # topmost solid post top by top_rim of world z; the PCB above the top
@@ -712,8 +731,10 @@ class Stand:
         also what centers a single set) and rises so that the rotated board's
         lowest outline point clears the base top and all posts keep
         MIN_POST_CENTER apart; the whole pattern then sits keyboard_drop
-        lower on the plate (user request; 20 mm keeps the lowest nut
-        pocket clear of the boot top).
+        lower on the plate (user request; with mount_lowest_screw = False
+        the outline floor is the only limit — the solver lifts the pattern
+        just enough to hold it, so the NET drop is keyboard_drop minus
+        that lift, ~29.1 mm at the default drop 30).
         Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
@@ -744,8 +765,7 @@ class Stand:
             )
             # the keyboard_drop shift lowers the pattern, so the same
             # material needs that much more lift to hold the floor; at
-            # t30/-35 the drop already spends the whole margin and the
-            # clamp zeroes the lift
+            # t30/-35 the floor binds and eats ~0.9 of the drop (net 29.1)
             lift = max(0.0, v_floor - (cv + vmin) + keyboard_drop)
             lifted.append((ang, lift, [(u, v + lift) for u, v in pts]))
 
@@ -832,15 +852,16 @@ class Stand:
         return sorted(chosen)
 
     def _cap_haunch(self) -> float:
-        """Cap the haunch height so its ridge never runs behind a post's
-        back-face hardware: the screw clearance bore and, wider still, the
+        """Cap the haunch height so its ridge never runs behind a mounted
+        post's back-face hardware: the screw clearance bore and, wider still, the
         nut pocket mouth (hex ~4.3 mm major radius plus wall, hence 6.5 mm
         clear of the post center). Floored at 2 mm: below that the wedge is
         a negligible sliver — it only softens the junction corner, the ribs
         carry the load — so once the pattern drops (keyboard_drop) the cap
         may shrink the haunch to nearly nothing instead of covering a
-        pocket mouth."""
-        min_y = min(y for _, y in self.all_posts)
+        pocket mouth. Only mounted posts (mount_lowest_screw) count — the
+        plain lowest post has no hardware to clear."""
+        min_y = min(y for _, y in self.mounted_posts)
         y_top = min_y - 6.5
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(2.0, min(haunch_h, h))
@@ -1000,8 +1021,21 @@ class Stand:
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
             )
+        # Flare clip: a deep pattern parks the lowest post's Ø15 flare foot
+        # past the plate's bottom edge (t30/-35 at drop 30: the unscrewed
+        # post centers at y ~ 5.6, its flare reaches y ~ -1.9). The plate
+        # itself already spans y >= 0, so intersect the finished solid with
+        # a generous y >= 0 box: any overhanging flare is trimmed flush
+        # with the plate's bottom edge — a straight vertical clip face,
+        # printable; the post top's bearing area is untouched.
+        solid &= Pos(-self.plate_half - 20, 0, -20) * Box(
+            self.plate_w + 40,
+            self.plate_h + 20,
+            plate_t + self.post_h + 40,
+            align=(Align.MIN, Align.MIN, Align.MIN),
+        )
         top = self.face_z
-        for hole in self.all_posts:
+        for hole in self.mounted_posts:  # the lowest post stays plain
             x, y = hole
             if self.attach == 'nut':
                 # Clamp from the back: the post top stays SOLID and bears the
@@ -1149,15 +1183,17 @@ class Stand:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
                 Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
             )
-        # keyboard_drop parks the lowest post's back-face nut pocket inside
-        # the boot's z-band (t30/-35: mouth spans world z 8.4..15.3 vs boot
-        # top 14), burying its pinch mouth. Cut an access window through the
-        # boot in front of that pocket: the nut slides in with tweezers, and
-        # the pinch lip — which lives in the plate — still retains it.
-        # Boot-only cut, applied before the union, so the plate's pocket and
-        # nut seat stay intact. Skipped when the lowest pocket clears the
-        # boot top on its own (smaller drops, other tilts).
-        lo_x, lo_y = min(self.all_posts, key=lambda p: p[1])
+        # keyboard_drop can park the lowest MOUNTED post's back-face nut
+        # pocket inside the boot's z-band (t30/-35 drop 20: mouth spans
+        # world z 8.4..15.3 vs boot top 14), burying its pinch mouth. Cut
+        # an access window through the boot in front of that pocket: the
+        # nut slides in with tweezers, and the pinch lip — which lives in
+        # the plate — still retains it. Boot-only cut, applied before the
+        # union, so the plate's pocket and nut seat stay intact. With
+        # mount_lowest_screw = False the lowest post has no pocket at all,
+        # so this auto-skips whenever the lowest MOUNTED pocket clears the
+        # boot top on its own (drop 30 / t30/-35: mouth z ~ 47 mm).
+        lo_x, lo_y = min(self.mounted_posts, key=lambda p: p[1])
         if (lo_y - 3.98) * self.ct < boot_h + 0.5:
             # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
             win_y1 = (lo_y + 4.0) * self.st + 2.0
