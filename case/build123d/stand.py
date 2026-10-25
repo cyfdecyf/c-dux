@@ -1066,6 +1066,22 @@ class Stand:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
                 Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
             )
+        # keyboard_drop parks the lowest post's back-face nut pocket inside
+        # the boot's z-band (t30/-35: mouth spans world z 8.4..15.3 vs boot
+        # top 14), burying its pinch mouth. Cut an access window through the
+        # boot in front of that pocket: the nut slides in with tweezers, and
+        # the pinch lip — which lives in the plate — still retains it.
+        # Boot-only cut, applied before the union, so the plate's pocket and
+        # nut seat stay intact. Skipped when the lowest pocket clears the
+        # boot top on its own (smaller drops, other tilts).
+        lo_x, lo_y = min(self.all_posts, key=lambda p: p[1])
+        if (lo_y - 3.98) * self.ct < boot_h + 0.5:
+            # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
+            win_y1 = (lo_y + 4.0) * self.st + 2.0
+            boot -= Pos(lo_x - 5.5, boot_front, base_t - EPS) * Box(
+                11.0, win_y1 - boot_front, boot_h + 2 * EPS,
+                align=(Align.MIN, Align.MIN, MIN),
+            )
         body += boot
         if self.flange_w > 0:
             body += self._breakaway_flange(flush_w)
