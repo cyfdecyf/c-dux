@@ -1261,6 +1261,36 @@ class Stand:
                     _half_plane_cutter(a, b, x_lo, x_hi, 0.0, self.plate_h + ext),
                     plate_t + 2 * EPS,
                 )
+            # Soften the four corners the cut lines leave behind (user: the
+            # sharp edges feel harsh and the ridge apex is a knock-prone
+            # stress point). Each cut face contributes two plate-thickness
+            # edges — one at the ridge apex, one at the lower junction with
+            # the plate edge. Fillet all four together, backing the radius
+            # off if OCC refuses (the two ridge corners can sit close
+            # together on narrow caps).
+            corner_edges = []
+            for _name, (a, b) in cuts.items():
+                ux, uy = b[0] - a[0], b[1] - a[1]
+                ln = math.hypot(ux, uy)
+                corner_edges += [
+                    e
+                    for e in solid.edges()
+                    if abs(e.length - plate_t) < 1e-3
+                    and abs(ux * (e.center().Y - a[1])
+                            - uy * (e.center().X - a[0])) / ln < 1e-4
+                ]
+            assert len(corner_edges) == 4, (
+                f'expected 4 cut-line corner edges, found {len(corner_edges)}'
+            )
+            for r in (3.5, 2.5, 1.5):
+                try:
+                    solid = fillet(corner_edges, r)
+                    print(f'note: cut-line corners rounded r={r} (4 edges)')
+                    break
+                except Exception:
+                    continue
+            else:
+                print('warning: cut-line corner rounding failed — left sharp')
         for hole in self.all_posts:
             x, y = hole
             post = Pos(x, y, plate_t) * Cylinder(
