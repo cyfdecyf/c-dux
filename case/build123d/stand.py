@@ -236,16 +236,18 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-# boot_front is DERIVED per instance (see __init__): flush with the
-# plate's bottom-front corner (-ct * plate_t), so the boot buries the raw
-# bottom edge and the foot gets a complete vertical front wall. The old
-# flush-with-back-face front (0) needed a 45 deg lip chamfer to keep the
-# bottom edge face printable — that notch is gone: the edge never prints
-# inside the boot, and the raised foot platform reads as one full block.
-# Only the boot box (and the flange/access window tracking it) uses this
-# value — the reinforcement wedges anchor to the back face instead (see
-# _wedge), and the lowest post's pilot exit stays buried in boot/toe
-# plastic, re-cut through it (extra bite for the self-tapper)
+# boot_front is DERIVED per instance (see __init__): the plate's front
+# surface plane continued down to the seat (-plate_t / cos(tilt)), so the
+# boot's front face IS the plate surface flush to the base — one
+# uninterrupted inclined face from the toe up through the keyboard area,
+# the raw bottom edge buried inside, no step at boot-top height, and a
+# constant post_h gap to the PCB. The old flush-with-back-face front (0)
+# needed a 45 deg lip chamfer to keep the bottom edge face printable —
+# that notch is gone. Only the boot prism (and the flange/access window
+# tracking it) uses this value — the reinforcement wedges anchor to the
+# back face instead (see _wedge), and the lowest post's pilot exit stays
+# buried in boot/toe plastic, re-cut through it (extra bite for the
+# self-tapper)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
@@ -696,13 +698,14 @@ class Stand:
         # boot_mid == band_mid — keys and grooves stay anchored to band_mid.
         self.boot_lo = self.slab_lo + boot_inset
         self.boot_hi = self.slab_hi - boot_inset
-        # Boot front edge (see the boot_front note by the constants): flush
-        # with the plate's bottom-front corner line, so the boot buries the
-        # raw bottom edge — the old flush-with-back-face front (0) left that
-        # edge printing as a floating ramp and forced the 45 deg lip chamfer
-        # notch. tilts toward vertical push the corner further forward
-        # (t10: -5.9), t30 sits at -5.2.
-        self.boot_front = -self.ct * plate_t
+        # Boot front edge (see the boot_front note by the constants): the
+        # plate's front surface plane continued down to the seat. -plate_t/ct
+        # is where that plane crosses the seat plane; from there the boot's
+        # front face rises PARALLEL to the plate, burying the raw bottom edge
+        # flush, leaving no step at boot-top height, and keeping a constant
+        # post_h gap to the PCB underside plane. Tilts toward vertical push
+        # the toe further forward (t10: -6.09); t30: -6.93.
+        self.boot_front = -plate_t / self.ct
         # The plate's bottom band is clamped to the boot footprint: the raw
         # post-need edges used to keep 2 mm of sideways overhang past the
         # narrowed boot at each bottom corner (user-flagged on a back-view
@@ -1332,11 +1335,23 @@ class Stand:
         # 1.5 mm — the screws hug the boot edges by construction (see
         # __init__).
         boot_w = self.boot_hi - self.boot_lo
-        boot = Pos(
-            (self.boot_lo + self.boot_hi) / 2,
-            (self.boot_front + self.boot_rear) / 2,
-            base_t + boot_h / 2,
-        ) * Box(boot_w, self.boot_rear - self.boot_front, boot_h)
+        # Front face = the PLATE's front surface continued down to the seat
+        # (user sketch): from the toe at (boot_front, base_t) the face rises
+        # parallel to the plate, so the top front edge lands exactly on the
+        # plate front face at boot-top height — one uninterrupted surface,
+        # no step, constant post_h gap to the PCB. YZ trapezoid, not a box,
+        # for that inclined front.
+        boot = Pos(self.boot_lo, 0, 0) * extrude(
+            Plane.YZ
+            * Polygon(
+                (self.boot_front, base_t),
+                (self.boot_rear, base_t),
+                (self.boot_rear, base_t + boot_h),
+                (self.boot_front + boot_h * self.st / self.ct,
+                 base_t + boot_h),
+            ),
+            boot_w,
+        )
         # Boot-wide haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner
         # corner. y anchor 0 = the backplate's back face; the wedge
