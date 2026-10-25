@@ -22,14 +22,11 @@ Highlights over the retired OpenSCAD version:
     driven up from the open base underside into nuts seated in the boot.
   * Junction reinforcement survives the split: the wide haunch and the
     back-face ribs moved onto the upright's boot.
-  * PCB clamped by 3 screws: solid Ø10 post tops bear the board (all 4 of
-    them — typing loads are compression into the post tops) while each M4
-    nut sits in a hex pocket opened at the plate's BACK face behind its
-    post (hex pinch mouth — snap the nut in, it stays with the upright).
-    The lowest post is a plain bearing post (mount_lowest_screw = False):
-    no bore, no pocket, which frees the pattern to drop to the outline
-    floor. M4x12 screws: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm +
-    3.4 nut.
+  * PCB held by 4 screws: 3 M4 nuts in back-face hex pockets clamp the
+    board; the lowest post is self-tapped instead (Ø tap_d pilot straight
+    through post + plate — after the drop its back-face pocket would sit
+    inside the boot's z-band with no insertion access, and a tapped hole
+    needs none; the boot plastic behind it only adds engagement).
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
@@ -129,11 +126,11 @@ keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 # caps the NET drop at ~29.1 mm — the solver lifts the pattern just enough
 # to hold the 2 mm base-top margin: printed lowest PCB outline point
 # z = 8.00, lift ~0.9. The old 20 cap guarded the lowest post's back-face
-# nut pocket vs the boot top; mount_lowest_screw = False removes it)
-mount_lowest_screw = False  # lowest post is a plain bearing post (no bore,
-# no pocket): 3 screws clamp the board, typing loads are compression into
-# all 4 post tops; dropping the lowest screw removes the pocket-vs-boot
-# constraint so the pattern can drop to the outline floor
+# nut pocket vs the boot top; lowest_post_tapped = True removes it)
+lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
+# instead of a nut pocket: after the drop its back-face pocket would sit
+# inside the boot's z-band with no insertion access, and a tapped hole needs
+# none — the boot plastic right behind the back face only adds engagement
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -610,17 +607,18 @@ class Stand:
 
         self.sets, self.set_meta = self._solve_sets(set_angles)
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
-        # Hardware-bearing posts: with mount_lowest_screw = False the lowest
-        # post carries no bore/pocket — a plain bearing point (typing loads
-        # are compression into all 4 post tops; only clamping is 3 screws).
-        # Board geometry (taper hull, bulges, band edges, posts themselves)
-        # keeps using all_posts.
+        # The lowest post is self-tapped (Ø tap_d pilot, no nut): after the
+        # drop its back-face pocket would sit inside the boot's z-band with
+        # no insertion access, and a tapped hole needs none — the boot
+        # material right behind the back face only adds engagement. Nut
+        # pockets (and the back-face clearances they need: haunch cap, boot
+        # access window) only concern the pocket posts. Board geometry
+        # (taper hull, bulges, band edges, posts themselves) keeps using
+        # all_posts.
         self.lowest_post = min(self.all_posts, key=lambda p: p[1])
-        self.mounted_posts = (
-            self.all_posts
-            if mount_lowest_screw
-            else [p for p in self.all_posts if p != self.lowest_post]
-        )
+        self.pocket_posts = [
+            p for p in self.all_posts if p != self.lowest_post
+        ]
         # Height rule (user): the upright only needs to cover, vertically, from
         # the desk up to the topmost screw hole — the plate top edge clears the
         # topmost solid post top by top_rim of world z; the PCB above the top
@@ -727,8 +725,8 @@ class Stand:
         also what centers a single set) and rises so that the rotated board's
         lowest outline point clears the base top and all posts keep
         MIN_POST_CENTER apart; the whole pattern then sits keyboard_drop
-        lower on the plate (user request; with mount_lowest_screw = False
-        the outline floor is the only limit — the solver lifts the pattern
+        lower on the plate (user request; with lowest_post_tapped the
+        outline floor is the only limit — the solver lifts the pattern
         just enough to hold it, so the NET drop is keyboard_drop minus
         that lift, ~29.1 mm at the default drop 30).
         Optimizes for the largest minimum post distance, tie-broken by
@@ -867,9 +865,9 @@ class Stand:
         a negligible sliver — it only softens the junction corner, the ribs
         carry the load — so once the pattern drops (keyboard_drop) the cap
         may shrink the haunch to nearly nothing instead of covering a
-        pocket mouth. Only mounted posts (mount_lowest_screw) count — the
-        plain lowest post has no hardware to clear."""
-        min_y = min(y for _, y in self.mounted_posts)
+        pocket mouth. Only pocket posts count — the lowest post's
+        self-tapping pilot is a plain bore and needs no back-face access."""
+        min_y = min(y for _, y in self.pocket_posts)
         y_top = min_y - 6.5
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(2.0, min(haunch_h, h))
@@ -1046,8 +1044,21 @@ class Stand:
             align=(Align.MIN, Align.MIN, Align.MIN),
         )
         top = self.face_z
-        for hole in self.mounted_posts:  # the lowest post stays plain
+        for hole in self.all_posts:
             x, y = hole
+            if hole == self.lowest_post:
+                # Lowest post: self-tapping pilot straight through post +
+                # plate. A nut pocket here would sit inside the boot's
+                # z-band (unreachable), and a tapped hole needs no back-face
+                # access — the boot plastic right behind the back face only
+                # adds thread engagement for the ~1.4 mm the M4 screw tip
+                # reaches past it.
+                solid -= Pos(x, y, -EPS) * Cylinder(
+                    tap_d / 2,
+                    top + 2 * EPS,
+                    align=(Align.CENTER, Align.CENTER, MIN),
+                )
+                continue
             if self.attach == 'nut':
                 # Clamp from the back: the post top stays SOLID and bears the
                 # PCB; the M4 nut lives in a hex pocket opened at the plate's
@@ -1197,17 +1208,18 @@ class Stand:
             boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
                 Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
             )
-        # keyboard_drop can park the lowest MOUNTED post's back-face nut
+        # keyboard_drop can park the lowest POCKET post's back-face nut
         # pocket inside the boot's z-band (t30/-35 drop 20: mouth spans
         # world z 8.4..15.3 vs boot top 14), burying its pinch mouth. Cut
         # an access window through the boot in front of that pocket: the
         # nut slides in with tweezers, and the pinch lip — which lives in
         # the plate — still retains it. Boot-only cut, applied before the
         # union, so the plate's pocket and nut seat stay intact. With
-        # mount_lowest_screw = False the lowest post has no pocket at all,
-        # so this auto-skips whenever the lowest MOUNTED pocket clears the
-        # boot top on its own (drop 30 / t30/-35: mouth z ~ 47 mm).
-        lo_x, lo_y = min(self.mounted_posts, key=lambda p: p[1])
+        # lowest_post_tapped = True the lowest post has a plain self-tap
+        # pilot (no pocket, no access needed), so this auto-skips whenever
+        # the lowest POCKET clears the boot top on its own (drop 30 /
+        # t30/-35: lowest pocket mouth z ~ 47 mm).
+        lo_x, lo_y = min(self.pocket_posts, key=lambda p: p[1])
         if (lo_y - 3.98) * self.ct < boot_h + 0.5:
             # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
             win_y1 = (lo_y + 4.0) * self.st + 2.0
@@ -1220,6 +1232,22 @@ class Stand:
             body += self._breakaway_flange()
         body -= joint_grooves()
         body -= joint_nut_pockets()
+        # Re-cut the lowest post's self-tap pilot: the boot union would
+        # otherwise fill it — the boot box covers the plate's lower back
+        # region (world z up to 14, the pilot sits at ~12.9 at t30/-35).
+        # Cutting it here also lets the screw tap into the boot plastic
+        # right behind the back face, which only adds engagement.
+        x, y = self.lowest_post
+        body -= (
+            Pos(0, 0, self.origin_z)
+            * Rot(X=90 - self.tilt)
+            * Pos(x, y, -EPS)
+            * Cylinder(
+                tap_d / 2,
+                self.face_z + 2 * EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+        )
         # Trims the bottom post flares, which dip below the seat plane at
         # low tilt angles (nothing else lives down there).
         body -= Pos(0, 0, base_t - 25) * Box(400, 400, 50)
