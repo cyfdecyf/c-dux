@@ -162,7 +162,8 @@ nut_pocket_depth = 4.6  # PCB nut pocket depth into the plate: lip + nut_h;
 #                         the Ø10 post directly buttresses — the nut bears
 #                         on that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
-tap_d = 3.4
+tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
+#             straight in; user-sized up from the 3.4 first draft)
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 #            for walls around the (since deleted) coin slots; 6 is plenty
 #            for a flat slab and drops the keyboard 2 mm
@@ -235,28 +236,21 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-boot_front = 0  # boot front edge flush with the plate's back face at the
-#                seat: no front lip AND no step — the plate's back face
-#                meets the boot front continuously (the old +4.5 recess
-#                left a triangular sliver gap/step at the junction). Only
-#                the boot box tracks this constant — the reinforcement
-#                wedges anchor to the back face instead (see _wedge), so
-#                moving the front cannot detach them; the lowest post's
-#                pilot exit is buried in boot/toe plastic and re-cut
-#                through it (extra bite for the self-tapper)
+# boot_front is DERIVED per instance (see __init__): flush with the
+# plate's bottom-front corner (-ct * plate_t), so the boot buries the raw
+# bottom edge and the foot gets a complete vertical front wall. The old
+# flush-with-back-face front (0) needed a 45 deg lip chamfer to keep the
+# bottom edge face printable — that notch is gone: the edge never prints
+# inside the boot, and the raised foot platform reads as one full block.
+# Only the boot box (and the flange/access window tracking it) uses this
+# value — the reinforcement wedges anchor to the back face instead (see
+# _wedge), and the lowest post's pilot exit stays buried in boot/toe
+# plastic, re-cut through it (extra bite for the self-tapper)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
 #                 free-standing CoM margin — and extends rearward past this
 #                 default whenever the measured CoM demands it
-lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
-#                   lip; 0 disables. Anchored at the plate's seat-plane
-#                   corner (y=0, z=base_t) so the 45 deg face bounds the
-#                   print from layer 1: the raw bottom edge face sweeps
-#                   over the bed at (90 - tilt) from horizontal - in front
-#                   of the boot it printed as a floating ramp (0.55
-#                   mm/layer at 20 deg); at 45 deg each layer advances
-#                   <= half a line width, so the ramp is float-free
 flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
 #                 enough to anchor tall prints on slick beds, snaps off
 #                 with pliers after printing
@@ -702,6 +696,13 @@ class Stand:
         # boot_mid == band_mid — keys and grooves stay anchored to band_mid.
         self.boot_lo = self.slab_lo + boot_inset
         self.boot_hi = self.slab_hi - boot_inset
+        # Boot front edge (see the boot_front note by the constants): flush
+        # with the plate's bottom-front corner line, so the boot buries the
+        # raw bottom edge — the old flush-with-back-face front (0) left that
+        # edge printing as a floating ramp and forced the 45 deg lip chamfer
+        # notch. tilts toward vertical push the corner further forward
+        # (t10: -5.9), t30 sits at -5.2.
+        self.boot_front = -self.ct * plate_t
         # The plate's bottom band is clamped to the boot footprint: the raw
         # post-need edges used to keep 2 mm of sideways overhang past the
         # narrowed boot at each bottom corner (user-flagged on a back-view
@@ -1313,33 +1314,17 @@ class Stand:
 
     def upright_solid(self):
         """The demountable half: everything above the seat plane, printed
-        boot-down on the bed. Exported pose is the print pose; layer-by-layer
-        audits (facets + per-layer float) show no bridging and no air-start
-        once the front lip is chamfered."""
+        boot-down on the bed (slicer drops the STL's boot face to z=0).
+        Layer-by-layer audits (facets + per-layer float) show no bridging
+        and no air-start: the raw plate bottom edge is buried inside the
+        forward-extended boot, so nothing sweeps over the bed but full
+        walls."""
         rad = math.radians(self.tilt)
         body = (
             Pos(0, 0, self.origin_z)
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
-        if lip_chamfer > 0:
-            # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
-            # Applied before the boot union: the cut spans world y <= 0,
-            # entirely in front of the boot footprint (front +4.5), so the
-            # boot itself is untouched.
-            body -= (
-                Pos(-(self.plate_w + 20) / 2, 0, 0)
-                * extrude(
-                    Plane.YZ
-                    * Polygon(
-                        (0, base_t),
-                        (-lip_chamfer, base_t + lip_chamfer),
-                        (-lip_chamfer, base_t),
-                        align=None,
-                    ),
-                    self.plate_w + 20,
-                )
-            )
         # boot + haunch + ribs span the boot footprint: the slab inset by
         # boot_inset per side, so the foot sits fully on the slab's flat top
         # inside the base_top_fillet round-over (the plate band is clamped
@@ -1349,9 +1334,9 @@ class Stand:
         boot_w = self.boot_hi - self.boot_lo
         boot = Pos(
             (self.boot_lo + self.boot_hi) / 2,
-            (boot_front + self.boot_rear) / 2,
+            (self.boot_front + self.boot_rear) / 2,
             base_t + boot_h / 2,
-        ) * Box(boot_w, self.boot_rear - boot_front, boot_h)
+        ) * Box(boot_w, self.boot_rear - self.boot_front, boot_h)
         # Boot-wide haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner
         # corner. y anchor 0 = the backplate's back face; the wedge
@@ -1385,8 +1370,8 @@ class Stand:
         if (lo_y - 3.98) * self.ct < boot_h + 0.5:
             # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
             win_y1 = (lo_y + 4.0) * self.st + 2.0
-            boot -= Pos(lo_x - 5.5, boot_front, base_t - EPS) * Box(
-                11.0, win_y1 - boot_front, boot_h + 2 * EPS,
+            boot -= Pos(lo_x - 5.5, self.boot_front, base_t - EPS) * Box(
+                11.0, win_y1 - self.boot_front, boot_h + 2 * EPS,
                 align=(Align.MIN, Align.MIN, MIN),
             )
         body += boot
@@ -1430,10 +1415,10 @@ class Stand:
         P1-P2 runs parallel to the back face, e = 1.5 mm perpendicular
         inside it: full-height contact with the plate regardless of
         boot_front. P1 is slid e / cos along the seat plane so the base
-        edge lies flat ON it — over the boot aft of y = 4.5, and on the
-        bed across the ~1.7 mm strip in front of the 45 deg lip chamfer
-        (first-layer material; the face above leans back at tilt from
-        vertical, self-supporting). Putting P1 at the perpendicular foot
+        edge lies flat ON it — entirely on the boot, whose front edge now
+        reaches forward of the plate's back face (buried lip; first-layer
+        material; the face above leans back at tilt from vertical,
+        self-supporting). Putting P1 at the perpendicular foot
         instead (e * sin up) would float that strip's base edge over the
         recessed boot-front pocket. The hypotenuse faces up-forward
         throughout (rib: leans back ~12.6 deg from vertical; haunch:
@@ -1454,20 +1439,19 @@ class Stand:
     def _breakaway_flange(self):
         """Thin ring around the boot footprint (--flange): bed-adhesion
         insurance for slick plates. flange_t tall so it snaps off with
-        pliers after printing; added after the lip chamfer cut, so the two
-        never interact, and clear of every joint feature. Follows the boot
-        footprint (the band inset by boot_inset), so it centers on the
-        band's mid-x too."""
+        pliers after printing, and clear of every joint feature. Follows
+        the boot footprint (the band inset by boot_inset, front edge
+        included), so it centers on the band's mid-x too."""
         boot_w = self.boot_hi - self.boot_lo
         outer = RectangleRounded(
             boot_w + 2 * self.flange_w,
-            self.boot_rear - boot_front + 2 * self.flange_w,
+            self.boot_rear - self.boot_front + 2 * self.flange_w,
             4,
         )
-        inner = Rectangle(boot_w, self.boot_rear - boot_front)
+        inner = Rectangle(boot_w, self.boot_rear - self.boot_front)
         return Pos(
             (self.boot_lo + self.boot_hi) / 2,
-            (boot_front + self.boot_rear) / 2,
+            (self.boot_front + self.boot_rear) / 2,
             base_t,
         ) * extrude(outer - inner, flange_t)
 
@@ -1673,7 +1657,7 @@ def main() -> None:
         )
         print(
             f'boot: x [{stand.boot_lo:g}, {stand.boot_hi:g}], '
-            f'front {boot_front:g}, rear {stand.boot_rear:g} mm'
+            f'front {stand.boot_front:g}, rear {stand.boot_rear:g} mm'
             f'  | CoM y {stand.com_y:.1f} mm, rear margin '
             f'{stand.boot_rear - stand.com_y:.1f} mm'
         )
