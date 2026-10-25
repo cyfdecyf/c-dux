@@ -120,9 +120,11 @@ plate_margin = 10
 bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  v_floor keeps the board's lowest outline point clear of
 #                  the base top, and keyboard_drop eats most of that margin
-keyboard_drop = 28.0  # whole mounting pattern shifted DOWN the plate by this
-# much (user-measured request "键盘下移 3cm", trimmed to 28 mm so the lowest
-# post's flare and back-face nut pocket still fit above the plate bottom edge)
+keyboard_drop = 20.0  # whole mounting pattern shifted DOWN the plate by this
+# much (user asked for "键盘下移 3cm"; capped at 20 so the lowest post's
+# back-face nut pocket — mouth plus the nut's swing during insertion, and
+# the M4x12 tip that protrudes 2.6 mm — clears the boot top by >= 1.3 mm
+# and the nut inserts from open air; 28 buried the pocket in the boot)
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -687,7 +689,8 @@ class Stand:
         also what centers a single set) and rises so that the rotated board's
         lowest outline point clears the base top and all posts keep
         MIN_POST_CENTER apart; the whole pattern then sits keyboard_drop
-        lower on the plate (user-measured "键盘下移 3cm", trimmed to 28 mm).
+        lower on the plate (user request; 20 mm keeps the lowest nut
+        pocket clear of the boot top).
         Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)

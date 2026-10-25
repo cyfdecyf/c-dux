@@ -38,7 +38,7 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 - 站立系 → 板局部系(求解器输出):
   `x = u + shift − pcb_w/2`,
   `y = v + bottom_ext − keyboard_drop (+ lift)`(板底名义上比 PCB 底边
-  低 `bottom_ext` = 6.5 mm,整组图案再沿板下移 `keyboard_drop` = 28 mm;
+  低 `bottom_ext` = 6.5 mm,整组图案再沿板下移 `keyboard_drop` = 20 mm;
   lift 由高度约束解出,见 §5.1)。
 - 板框采样:`parse_pcb` 除孔位外还返回 Edge.Cuts 实际轮廓的 ~1 mm
   采样点(站立系 (u, v);ergogen 已把弧打散成短线,端点 + 线性插值
@@ -115,10 +115,13 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 
 高度/下移合成:`lift = max(0, v_floor − v'_min + keyboard_drop)`,柱位
 `y = v' + bottom_ext − keyboard_drop + lift`——整组图案沿板下移
-`keyboard_drop` 28 mm(用户实测"键盘下移 3cm"),下移吃掉多少余量,
-同一点料就需要多少额外抬升;t30/−35 下移正好用完 2 mm 余量
-(lift 归零,最低材料点距底座顶面 ~0.9 mm),`--set-angles -20` 时
-约束仍然 binds(lift ≈ 8.7,最低点恰在 8.0)。
+`keyboard_drop` 20 mm(用户要求“键盘下移 3cm”),下移吃掉多少余量,
+同一点料就需要多少额外抬升;20 mm 不是高度约束的限制,而是操作限制:
+最低柱(H3)的背面沉孔口必须完全露出靴座顶面,螺母才能直接放入
+(沉孔口下缘 z ≈ 15.3 vs 靴座顶 14,含螺母放入时的摆动余量);
+曾用 28 mm,沉孔口被靴座埋住(见 §6.3 取放窗口,现在该窗口仅在
+更大下移时自动触发);其它角度下高度约束照常逐角度生效(如
+`--set-angles -20` 时约束仍然 binds,lift ≈ 8.7,最低点恰在 8.0)。
 
 当前默认 `TILT 30 / SET_ANGLES [-35]`:单组 4 柱,柱位 y =
 6.7 / 52.3 / 77.3 / 112.8(H3 最低,螺母沉孔完整落在板上,喇叭口足环
@@ -202,11 +205,12 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 
 **调节旋钮**(改变造型/布局,改动后重跑审计即可):`plate_margin、
 taper_margin、haunch_d、rib_*、RIB_TARGET、SHIFT_*、TILT、SET_ANGLES、
-post_h(CLI)、flange_t、lip_chamfer、pad_*`。`keyboard_drop = 28` 特殊:
-用户实测需求("键盘下移 3cm"收敛到 28),整组安装图案沿板下移;
-上限受最低柱限制——喇叭口足环(半径 7.5)与背面螺母沉孔不得越出板底
-缘,当前布局压线(柱心 y 6.7,足环越缘 ~0.8 mm,再加大必须先裁矮
-喇叭口或减 drop)。`bottom_ext = 6.5` 只是名义板底延伸:实际板底缘
+post_h(CLI)、flange_t、lip_chamfer、pad_*`。`keyboard_drop = 20` 特殊:
+用户实测需求(“键盘下移 3cm”),整组安装图案沿板下移;
+上限由操作约束决定——最低柱背面沉孔口(含螺母摆动与 M4×12 尾部
+伸出的 ~2.6 mm)必须露出靴座顶面 ≥1.3 mm,故从 28 回收到 20;
+再加大必须先接受沉孔口被靴座部分埋住(代码会自动开取放窗口),
+或裁矮喇叭口/减 drop)。`bottom_ext = 6.5` 只是名义板底延伸:实际板底缘
 = `bottom_ext − keyboard_drop + lift`,已基本贴住键盘最低材料点。
 `boot_rear` 特殊:模块常数只是默认下限,实例值由 `__init__` 两遍构建
 按质心自动后伸(见 §6.3),改它请改派生规则里的余量(8 mm)而不是常数。
