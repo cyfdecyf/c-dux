@@ -579,20 +579,35 @@ def _half_plane_cutter(
     x_hi: float,
     y_lo: float,
     y_hi: float,
-    ext: float = 20.0,
 ):
     """2D cutter polygon covering everything LEFT of the directed line
-    a -> b, clipped to [x_lo, x_hi] x [y_lo, y_hi]. The line runs `ext`
-    past both anchors before the corners close the polygon, so the boolean
-    never leaves sliver faces where the cut meets the plate boundary."""
+    a -> b, clipped to [x_lo, x_hi] x [y_lo, y_hi]. Sutherland-Hodgman
+    clipping of the rectangle against the half plane, so the boolean
+    never leaves sliver faces where the cut meets the plate boundary.
+    (Picking the two farthest-projection rectangle corners instead only
+    works while those are adjacent corners; once both land on the same
+    edge the quad folds into a concave dart and silently under-cuts —
+    the new left top-corner line hit exactly that.)"""
     dx, dy = b[0] - a[0], b[1] - a[1]
     ln = math.hypot(dx, dy)
-    a2 = (a[0] - ext * dx / ln, a[1] - ext * dy / ln)
-    b2 = (b[0] + ext * dx / ln, b[1] + ext * dy / ln)
     nx, ny = -dy / ln, dx / ln  # unit normal, left of a -> b
-    corners = [(x_lo, y_hi), (x_hi, y_hi), (x_hi, y_lo), (x_lo, y_lo)]
-    far = sorted(corners, key=lambda c: c[0] * nx + c[1] * ny)[-2:]
-    return Polygon(*_ccw([a2, b2, *far]), align=None)
+    rect = [(x_lo, y_hi), (x_hi, y_hi), (x_hi, y_lo), (x_lo, y_lo)]
+    out: list[tuple[float, float]] = []
+    for i, p in enumerate(rect):
+        q = rect[(i + 1) % len(rect)]
+        dp = (p[0] - a[0]) * nx + (p[1] - a[1]) * ny
+        dq = (q[0] - a[0]) * nx + (q[1] - a[1]) * ny
+        if dp >= 0:
+            out.append(p)
+        if dp * dq < 0:  # strict crossing: intersection strictly inside the edge
+            t = dp / (dp - dq)
+            out.append((p[0] + t * (q[0] - p[0]), p[1] + t * (q[1] - p[1])))
+    if len(out) < 3:
+        sys.exit(
+            f'error: half-plane cutter ({a} -> {b}) misses the clip '
+            f'rectangle [{x_lo}, {x_hi}] x [{y_lo}, {y_hi}]'
+        )
+    return Polygon(*_ccw(out), align=None)
 
 
 class Stand:
@@ -1016,26 +1031,42 @@ class Stand:
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
         # Top-corner trim (user sketch, back view): two straight cuts across
-        # the tapered roof, one per top corner, with a narrow cap over the
+        # the tapered roof, one per top corner, with a cap over the
         # top post left between them. Both lines are anchored to layout
         # values (band edges, post x/y, plate_h), so they track layout
         # changes; the post-clearance guard below is the tripwire that
         # fails loudly if a future layout ever walks a nut pocket into one.
-        #   left:  (band_lo, y0 + 10) -> (top post x + 5, plate_h + 1)
+        #   left:  (band_lo, leftmost post keep-box top + 2)
+        #          -> (top post x - 5, plate_h + 1): the low anchor sits
+        #          BELOW the band top on purpose — the line crosses the
+        #          plate's left edge under y0 and trims the band's
+        #          top-left corner, stopping >= 2 mm above the leftmost
+        #          post's keep-box (newest sketch: cut more of the left
+        #          roof) — and ends left of the top post, widening the cap
         #   right: (top post x + 12, plate_h + 1) -> (band_hi, hi post y + 11.7)
         y0 = rib_h / self.ct + taper_margin
         if y0 < self.plate_h:  # only when the roof is actually tapered
             top_x = max(self.all_posts, key=lambda p: p[1])[0]  # H2: top post
             hi_y = max(self.all_posts, key=lambda p: p[0])[1]  # H1: outboard
+            keep = post_d / 2 + post_edge_margin
+            left_y = min(self.all_posts, key=lambda p: p[0])[1]
             cuts = (
-                ('left', (self.band_lo, y0 + 10.0),
-                 (top_x + 5.0, self.plate_h + 1.0)),
+                ('left', (self.band_lo, left_y + keep + 2.0),
+                 (top_x - 5.0, self.plate_h + 1.0)),
                 ('right', (top_x + 12.0, self.plate_h + 1.0),
                  (self.band_hi, hi_y + 11.7)),
             )
-            # the band below y0 must be untouched: both on-plate line
-            # anchors sit above it (y0 + 10 and hi post y + 11.7)
-            assert all(a[1] > y0 and b[1] > y0 for _, a, b in cuts), (
+            # The left line's low anchor dips below y0 BY DESIGN (it trims
+            # the band's top-left corner) — lock it at/above the leftmost
+            # post's keep-box top + 2 mm so bore/pocket (which stay inside
+            # the keep-box) can never be touched. The left line's top
+            # anchor and the right line's band-side anchor must still sit
+            # above the full-width band.
+            assert cuts[0][1][1] >= left_y + keep + 2.0, (
+                'left top-corner cut anchors inside the leftmost '
+                "post's keep-box"
+            )
+            assert cuts[0][2][1] > y0 and cuts[1][2][1] > y0, (
                 'top-corner cut line dips into the full-width band'
             )
             # GUARD: the cuts intentionally pass closer to the posts than
