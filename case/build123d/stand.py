@@ -28,7 +28,8 @@ Highlights over the retired OpenSCAD version:
     board; the lowest post is self-tapped instead (Ø tap_d pilot straight
     through post + plate — after the drop its back-face pocket would sit
     inside the boot's z-band with no insertion access, and a tapped hole
-    needs none; the boot plastic behind it only adds engagement).
+    needs none; the recessed boot front (+4.5) leaves the pilot's rear
+    exit in open air).
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
@@ -132,7 +133,7 @@ keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
-# none — the boot plastic right behind the back face only adds engagement
+# none — with the boot front recessed (+4.5) the pilot exits into open air
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -217,9 +218,12 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-boot_front = 2  # boot front edge: 2 mm BEHIND the seat origin — no front lip;
-#                 the plate's 45° chamfered lip meets the base top directly
-#                 (the chamfer is self-supporting, the boot never carried it)
+boot_front = 4.5  # boot front edge, 4.5 mm behind the seat origin: the front
+#                   lip is gone entirely so the lowest post's self-tap pilot
+#                   exits into open air (H3 back face y ≈ 2.82, M4x12 tip
+#                   reaches y ≈ 4.03 → ~0.5 mm clearance past the tip); the
+#                   plate's 45° chamfered lip is self-supporting, so the
+#                   boot front never needed to underlie it anyway
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
@@ -609,8 +613,8 @@ class Stand:
         self.all_posts = [(x, y) for _, pts in self.sets for x, y in pts]
         # The lowest post is self-tapped (Ø tap_d pilot, no nut): after the
         # drop its back-face pocket would sit inside the boot's z-band with
-        # no insertion access, and a tapped hole needs none — the boot
-        # material right behind the back face only adds engagement. Nut
+        # no insertion access, and a tapped hole needs none — with the boot
+        # front recessed (+4.5) the pilot exits into open air. Nut
         # pockets (and the back-face clearances they need: haunch cap, boot
         # access window) only concern the pocket posts. Board geometry
         # (taper hull, bulges, band edges, posts themselves) keeps using
@@ -1071,9 +1075,9 @@ class Stand:
                 # Lowest post: self-tapping pilot straight through post +
                 # plate. A nut pocket here would sit inside the boot's
                 # z-band (unreachable), and a tapped hole needs no back-face
-                # access — the boot plastic right behind the back face only
-                # adds thread engagement for the ~1.4 mm the M4 screw tip
-                # reaches past it.
+                # access — the boot front is recessed (+4.5), so the M4
+                # screw tip (~y 4.03) clears the boot face by ~0.5 mm and
+                # the exit sits in open air.
                 solid -= Pos(x, y, -EPS) * Cylinder(
                     tap_d / 2,
                     top + 2 * EPS,
@@ -1165,7 +1169,7 @@ class Stand:
         if lip_chamfer > 0:
             # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
             # Applied before the boot union: the cut spans world y <= 0,
-            # entirely in front of the boot footprint (front +2), so the
+            # entirely in front of the boot footprint (front +4.5), so the
             # boot itself is untouched.
             body -= (
                 Pos(-(self.plate_w + 20) / 2, 0, 0)
@@ -1229,11 +1233,11 @@ class Stand:
             body += self._breakaway_flange()
         body -= joint_grooves(self.band_mid)
         body -= joint_nut_pockets(self.joint_screw_xs)
-        # Re-cut the lowest post's self-tap pilot: the boot union would
-        # otherwise fill it — the boot box covers the plate's lower back
-        # region (world z up to 14, the pilot sits at ~12.9 at t30/-35).
-        # Cutting it here also lets the screw tap into the boot plastic
-        # right behind the back face, which only adds engagement.
+        # Re-cut the lowest post's self-tap pilot. A guard now: at the
+        # default layout the recessed boot front (+4.5) no longer reaches
+        # the pilot's rear exit (back face y ~ 2.82), but other configs
+        # (deeper drop, lower tilt) could still park boot material over
+        # it — there the boot union would refill the bore, so cut again.
         x, y = self.lowest_post
         body -= (
             Pos(0, 0, self.origin_z)
