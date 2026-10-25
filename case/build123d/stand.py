@@ -53,7 +53,7 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default -35 deg CCW in the front view; negate to
+centroid by --set-angles (default -40 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest outline point (real Edge.Cuts material —
 the bbox corner holds no board) clears the base top by 2 mm, then shifts
@@ -219,7 +219,7 @@ boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             current working default: 30 deg with SET_ANGLES [-35]
+#             current working default: 30 deg with SET_ANGLES [-40]
 joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    (halved from the old 0.4 baseline — less slop on the
 #                    merged key bar; print a --part joint coupon FIRST to
@@ -293,11 +293,11 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 
 # --- rotation set ---------------------------------------------------------------
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
-# default 20 deg CCW in the front view, negate to mirror) sets the home-row
+# default -40 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
 # shifts the whole pattern keyboard_drop down the plate.
-SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-40]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -960,30 +960,76 @@ class Stand:
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
+    def _top_corner_cuts(self):
+        """The two top-corner trim lines (see plate_and_posts for the full
+        rationale), or None when the roof is not tapered. Pure layout math,
+        shared with _taper_outline — whose hull must never swing inboard of
+        these lines (see the anchor note there)."""
+        y0 = rib_h / self.ct + taper_margin
+        if y0 >= self.plate_h:
+            return None
+        top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
+        sides = {
+            'left': min(self.all_posts, key=lambda p: p[0]),   # H4
+            'right': max(self.all_posts, key=lambda p: p[0]),  # H1
+        }
+        e = post_d / 2 + 4.5  # Ø15 flare foot radius 7.5 + 2 mm user clearance
+        cuts: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+        normals: dict[str, tuple[float, float]] = {}
+        for name, side in sides.items():
+            dx, dy = side[0] - top[0], side[1] - top[1]
+            ln = math.hypot(dx, dy)
+            # outward unit normal: the perpendicular of top->side that
+            # points AWAY from the boot centre (band_mid, y0)
+            nx, ny = -dy / ln, dx / ln
+            if nx * (side[0] - self.band_mid) + ny * (side[1] - y0) < 0:
+                nx, ny = -nx, -ny
+            normals[name] = (nx, ny)
+            cuts[name] = (
+                (top[0] + e * nx, top[1] + e * ny),
+                (side[0] + e * nx, side[1] + e * ny),
+            )
+        return y0, cuts, normals
+
     def _taper_outline(self) -> list[tuple[float, float]]:
         """Retained outline above the full-width band: the convex hull of the
-        upper posts' keep-boxes (center +/- post_d/2 + post_edge_margin, top
-        clipped to the plate) plus the band's corners at the taper start. The
-        plate never touches the PCB, so up there it only carries the post
-        columns and the web between them — the hull is exactly that. Returns
-        [] when the band already reaches the plate top."""
+        posts' keep-boxes (center +/- post_d/2 + post_edge_margin, clamped to
+        the taper start / plate top) plus the band's corners at the taper
+        start. The plate never touches the PCB, so up there it only carries
+        the post columns and the web between them — the hull is exactly that.
+        Returns [] when the band already reaches the plate top."""
         y0 = rib_h / self.ct + taper_margin
         if y0 >= self.plate_h:
             return []
         keep = post_d / 2 + post_edge_margin
         # hull bottom corners at the per-side band edges: below the taper
         # start the plate is the (asymmetric) bottom band; post keep-boxes
-        # poking past a band edge widen the hull locally (the bulge)
+        # poking past a band edge widen the hull locally (the bulge). A post
+        # fully below the taper start keeps its x-span as a segment ON y0 —
+        # dropping it instead (the old rule) let the hull's side edge chord
+        # straight to the band corner, crossing INSIDE the top-corner cut
+        # line when the side post hangs low (t30/-40: H1 tops out at 80.4
+        # < y0 82.8) and the outline stepped line -> chord -> line just
+        # above that post (user-flagged render).
         pts = [(self.band_lo, y0), (self.band_hi, y0)]
         for x, y in self.all_posts:
-            if y + keep <= y0:
-                continue  # post stays inside the full-width band
-            pts += [
-                (x - keep, max(y - keep, y0)),
-                (x + keep, max(y - keep, y0)),
-                (x - keep, min(y + keep, self.plate_h)),
-                (x + keep, min(y + keep, self.plate_h)),
-            ]
+            lo = max(y - keep, y0)
+            hi = max(min(y + keep, self.plate_h), lo)
+            pts += [(x - keep, lo), (x + keep, lo), (x - keep, hi), (x + keep, hi)]
+        # Belt and braces for the same failure mode: anchor each side of the
+        # hull 2 mm outboard of its top-corner cut line at y0 (clamped to the
+        # blank). Both this anchor and the top post's box corner (perp. keep
+        # 10 vs the line's 9.5) sit on the OUTBOARD side of the line, and a
+        # half plane is convex — so the whole side edge between them stays
+        # outboard and the cut line remains the ONLY boundary on its side.
+        trimmed = self._top_corner_cuts()
+        if trimmed is not None:
+            _, cuts, _ = trimmed
+            for a, b in cuts.values():
+                x_at = a[0] + (y0 - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+                out = 2.0 if x_at >= self.band_mid else -2.0
+                x = min(max(x_at + out, -self.plate_half), self.plate_half)
+                pts.append((x, y0))
         return _convex_hull(pts)
 
     def plate_and_posts(self):
@@ -1048,32 +1094,13 @@ class Stand:
         # the lines covers the top post's boss. Anchors derive from the post
         # layout, so they track layout changes; the post-clearance guard
         # below is the tripwire that fails loudly if a future layout ever
-        # walks a nut pocket into a line.
-        y0 = rib_h / self.ct + taper_margin
-        if y0 < self.plate_h:  # only when the roof is actually tapered
+        # walks a nut pocket into a line. Line math lives in
+        # _top_corner_cuts (shared with _taper_outline, whose hull is kept
+        # outboard of these lines — see the anchor note there).
+        trimmed = self._top_corner_cuts()
+        if trimmed is not None:  # only when the roof is actually tapered
+            y0, cuts, normals = trimmed
             top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
-            sides = {
-                'left': min(self.all_posts, key=lambda p: p[0]),   # H4
-                'right': max(self.all_posts, key=lambda p: p[0]),  # H1
-            }
-            e = post_d / 2 + 4.5  # Ø15 flare foot radius 7.5 + 2 mm user
-            # clearance; the first 7 mm offset shaved the flare's outer
-            # seat flat (user-flagged)
-            cuts: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
-            normals: dict[str, tuple[float, float]] = {}
-            for name, side in sides.items():
-                dx, dy = side[0] - top[0], side[1] - top[1]
-                ln = math.hypot(dx, dy)
-                # outward unit normal: the perpendicular of top->side that
-                # points AWAY from the boot centre (band_mid, y0)
-                nx, ny = -dy / ln, dx / ln
-                if nx * (side[0] - self.band_mid) + ny * (side[1] - y0) < 0:
-                    nx, ny = -nx, -ny
-                normals[name] = (nx, ny)
-                cuts[name] = (
-                    (top[0] + e * nx, top[1] + e * ny),
-                    (side[0] + e * nx, side[1] + e * ny),
-                )
             assert all(
                 math.isfinite(v) for a, b in cuts.values() for v in a + b
             ), 'top-corner cut line anchors are not finite'
