@@ -13,10 +13,12 @@ Highlights over the retired OpenSCAD version:
     table and refuses to run if anything moved.
   * B-rep fillets: the base slab gets a rounded top perimeter, which CSG
     mesh tools cannot do.
-  * Demountable two-part design: the base slab tracks the bottom-band
+  * Demountable two-part design: the base slab tracks the raw post-need
     footprint (derived from the post layout); the boot is that footprint
     inset by boot_inset per side, so it seats fully on the slab's flat top
-    inside the 2 mm perimeter fillet (the plate band overhangs the foot).
+    inside the 2 mm perimeter fillet, and the plate's bottom band is
+    clamped to the boot footprint — flush at the bottom corners, no
+    sideways overhang.
     The upright (backplate + posts + boot foot) is printed per tilt angle;
     the slab only needs a reprint when a layout change moves the band — the
     joint screws, keys and ribs all derive from it. The joint is a merged
@@ -188,7 +190,10 @@ pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              stability; 2 mm still leaves the 0.6 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
-#                              slab's flat top, inside the 2 mm perimeter fillet
+#                              slab's flat top, inside the 2 mm perimeter
+#                              fillet; also the plate's bottom band edge —
+#                              the band is clamped flush to the boot (no
+#                              sideways overhang at the bottom corners)
 
 # --- base ↔ upright joint -------------------------------------------------------
 # The stand ships as two printed parts: the base slab (shared by every tilt
@@ -645,7 +650,7 @@ class Stand:
         # band: _auto_ribs only places them where they fit INSIDE it, and a
         # rib that fits nowhere is simply skipped (fewer ribs is normal).
         cap = PLATE_HALF_BOUND - 8
-        self.band_edges: dict[int, float] = {}
+        slab_edges: dict[int, float] = {}
         for sx in (-1, 1):
             post_need = max(
                 (abs(x) + keep for x, _ in self.all_posts if (x > 0) == (sx > 0)),
@@ -654,23 +659,36 @@ class Stand:
             edge = min(self.plate_half, math.ceil((post_need + 2) / 2) * 2)
             if edge > cap:
                 edge = min(self.plate_half, cap)
-            self.band_edges[sx] = sx * edge
-        self.band_lo = self.band_edges[-1]
-        self.band_hi = self.band_edges[1]
-        # the base slab IS the band footprint (bx = band width, slab centered
-        # on the band's mid-x); the boot below is that footprint inset by
-        # boot_inset per side (slab top fillet), the band deliberately
-        # overhangs the foot by exactly that
-        self.bx = self.band_hi - self.band_lo
-        self.band_mid = (self.band_lo + self.band_hi) / 2
-        # Boot footprint = band inset by boot_inset per side: the slab's top
+            slab_edges[sx] = sx * edge
+        self.slab_lo = slab_edges[-1]
+        self.slab_hi = slab_edges[1]
+        # the base slab IS the raw post-need footprint (bx = slab width, slab
+        # centered on the slab's mid-x); the pads hug the slab edges too. The
+        # band clamp below does not touch any of it — the slab keeps its size.
+        self.bx = self.slab_hi - self.slab_lo
+        # Boot footprint = slab inset by boot_inset per side: the slab's top
         # perimeter carries a base_top_fillet round-over, so only the inset
         # footprint sits fully on the flat top. Symmetric, hence
         # boot_mid == band_mid — keys and grooves stay anchored to band_mid.
-        self.boot_lo = self.band_lo + boot_inset
-        self.boot_hi = self.band_hi - boot_inset
+        self.boot_lo = self.slab_lo + boot_inset
+        self.boot_hi = self.slab_hi - boot_inset
+        # The plate's bottom band is clamped to the boot footprint: the raw
+        # post-need edges used to keep 2 mm of sideways overhang past the
+        # narrowed boot at each bottom corner (user-flagged on a back-view
+        # render), so the band now ends flush with the boot. Everything
+        # downstream (taper hull corners, top-corner cut anchors, bulge test,
+        # per-side plate trim) derives from band_lo/hi and follows. A post
+        # whose keep-box pokes past the clamped edge still gets its bulge
+        # tab (below); t30/-35 keeps H4 clear by ~0.7 mm, so only H1's tab.
+        self.band_lo = max(self.slab_lo, self.boot_lo)
+        self.band_hi = min(self.slab_hi, self.boot_hi)
+        # per-side clamped band edges (signed) — the bulge test here and the
+        # per-side plate trim in plate_and_posts key off these
+        self.band_edges: dict[int, float] = {-1: self.band_lo, 1: self.band_hi}
+        self.band_mid = (self.band_lo + self.band_hi) / 2
         # Joint screws hug the boot's outer edges: their nut seats must sit
-        # on the narrowed boot (not out under the overhanging band), and the
+        # on the narrowed boot (not out on the plate band, which ends flush
+        # with the boot), and the
         # boot edge is still the widest possible lever against pull-out, with
         # the keys centered on the boot in between. Derived, so they track
         # any future band move.
@@ -707,7 +725,8 @@ class Stand:
             for sx, spans in self.bulges
         )
         print(
-            f'note: bottom band x [{self.band_lo:g}, {self.band_hi:g}] mm, '
+            f'note: bottom band x [{self.band_lo:g}, {self.band_hi:g}] mm '
+            f'(slab [{self.slab_lo:g}, {self.slab_hi:g}]), '
             f'plate half {self.plate_half:.2f}'
             + (f'; post bulge(s) kept at {spans_txt}' if self.bulges else '')
         )
@@ -900,10 +919,11 @@ class Stand:
     # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
-        # per-side x: the slab IS the (asymmetric) band footprint, so each
-        # side's pad row hugs ITS band edge
-        px_lo = self.band_lo + base_r + pad_edge
-        px_hi = self.band_hi - base_r - pad_edge
+        # per-side x: the slab IS the raw (asymmetric) post-need footprint,
+        # so each side's pad row hugs ITS slab edge — unaffected by the band
+        # clamp (the base does not change when the plate band is trimmed)
+        px_lo = self.slab_lo + base_r + pad_edge
+        px_hi = self.slab_hi - base_r - pad_edge
         fy = self.y0 + base_r + pad_edge
         ry = self.y1 - base_r - pad_edge
         return [(px_lo, fy), (px_hi, fy), (0, fy), (px_lo, ry), (px_hi, ry), (0, ry)]
@@ -1127,11 +1147,11 @@ class Stand:
     # -- base, world frame (desk = XY plane, user at -Y) ----------------------
 
     def base_solid(self):
-        # the slab matches the bottom-band footprint (asymmetric — the Box
-        # centers on the band's mid-x, not on 0); the boot is this footprint
-        # inset by boot_inset per side, the slab itself keeps the full band
+        # the slab matches the raw post-need footprint (asymmetric — the Box
+        # centers on the slab's mid-x, not on 0); the plate's bottom band is
+        # clamped to the boot, but the slab itself keeps the full footprint
         base = Pos(
-            (self.band_lo + self.band_hi) / 2, (self.y0 + self.y1) / 2, base_t / 2
+            (self.slab_lo + self.slab_hi) / 2, (self.y0 + self.y1) / 2, base_t / 2
         ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
@@ -1184,10 +1204,10 @@ class Stand:
                     self.plate_w + 20,
                 )
             )
-        # boot + haunch + ribs span the boot footprint: the band inset by
+        # boot + haunch + ribs span the boot footprint: the slab inset by
         # boot_inset per side, so the foot sits fully on the slab's flat top
-        # inside the base_top_fillet round-over (the plate band overhangs it
-        # by exactly that). Outboard wall at the joint nut seats is a uniform
+        # inside the base_top_fillet round-over (the plate band is clamped
+        # flush to it). Outboard wall at the joint nut seats is a uniform
         # 1.5 mm — the screws hug the boot edges by construction (see
         # __init__).
         boot_w = self.boot_hi - self.boot_lo
