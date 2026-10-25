@@ -548,6 +548,29 @@ def _ccw(pts):
     return pts if area > 0 else pts[::-1]
 
 
+def _half_plane_cutter(
+    a: tuple[float, float],
+    b: tuple[float, float],
+    x_lo: float,
+    x_hi: float,
+    y_lo: float,
+    y_hi: float,
+    ext: float = 20.0,
+):
+    """2D cutter polygon covering everything LEFT of the directed line
+    a -> b, clipped to [x_lo, x_hi] x [y_lo, y_hi]. The line runs `ext`
+    past both anchors before the corners close the polygon, so the boolean
+    never leaves sliver faces where the cut meets the plate boundary."""
+    dx, dy = b[0] - a[0], b[1] - a[1]
+    ln = math.hypot(dx, dy)
+    a2 = (a[0] - ext * dx / ln, a[1] - ext * dy / ln)
+    b2 = (b[0] + ext * dx / ln, b[1] + ext * dy / ln)
+    nx, ny = -dy / ln, dx / ln  # unit normal, left of a -> b
+    corners = [(x_lo, y_hi), (x_hi, y_hi), (x_hi, y_lo), (x_lo, y_lo)]
+    far = sorted(corners, key=lambda c: c[0] * nx + c[1] * ny)[-2:]
+    return Polygon(*_ccw([a2, b2, *far]), align=None)
+
+
 class Stand:
     def __init__(
         self,
@@ -908,6 +931,63 @@ class Stand:
                 solid -= Pos(x_mid, (hi_a + lo_b) / 2, -EPS) * Box(
                     over, lo_b - hi_a, plate_t + 2 * EPS,
                     align=(Align.CENTER, Align.CENTER, MIN),
+                )
+        # Top-corner trim (user sketch, back view): two straight cuts across
+        # the tapered roof, one per top corner, with a narrow cap over the
+        # top post left between them. Both lines are anchored to layout
+        # values (band edges, post x/y, plate_h), so they track layout
+        # changes; the post-clearance guard below is the tripwire that
+        # fails loudly if a future layout ever walks a nut pocket into one.
+        #   left:  (band_lo, y0 + 10) -> (top post x + 5, plate_h + 1)
+        #   right: (top post x + 12, plate_h + 1) -> (band_hi, hi post y + 11.7)
+        y0 = rib_h / self.ct + taper_margin
+        if y0 < self.plate_h:  # only when the roof is actually tapered
+            top_x = max(self.all_posts, key=lambda p: p[1])[0]  # H2: top post
+            hi_y = max(self.all_posts, key=lambda p: p[0])[1]  # H1: outboard
+            cuts = (
+                ('left', (self.band_lo, y0 + 10.0),
+                 (top_x + 5.0, self.plate_h + 1.0)),
+                ('right', (top_x + 12.0, self.plate_h + 1.0),
+                 (self.band_hi, hi_y + 11.7)),
+            )
+            # the band below y0 must be untouched: both on-plate line
+            # anchors sit above it (y0 + 10 and hi post y + 11.7)
+            assert all(a[1] > y0 and b[1] > y0 for _, a, b in cuts), (
+                'top-corner cut line dips into the full-width band'
+            )
+            # GUARD: the cuts intentionally pass closer to the posts than
+            # the taper's 10 mm keep, but a back-face nut pocket must never
+            # be clipped: every post center keeps >= 6.5 mm to both lines
+            # (pocket across-corner radius 4.27 + pinch lip + wall margin,
+            # the figure the haunch cap uses). A layout change that violates
+            # this must fail loudly, not silently shave a pocket.
+            cut_guard = 6.5
+            for name, a, b in cuts:
+                ux, uy = b[0] - a[0], b[1] - a[1]
+                ln = math.hypot(ux, uy)
+                dists = [
+                    abs(ux * (py - a[1]) - uy * (px - a[0])) / ln
+                    for px, py in self.all_posts
+                ]
+                if min(dists) < cut_guard:
+                    listing = ', '.join(
+                        f'({px:g},{py:g})->{d:.2f}'
+                        for (px, py), d in zip(self.all_posts, dists, strict=True)
+                    )
+                    sys.exit(
+                        f'error: top-corner cut {name} passes within '
+                        f'{min(dists):.2f} mm of a post center (guard '
+                        f'{cut_guard} mm = nut pocket 4.27 + lip + margin); '
+                        f'distances: {listing}'
+                    )
+            # through-thickness polygon extrusions, same EPS style as the
+            # taper cutter; corners stay sharp (per sketch)
+            ext = 20.0
+            x_lo, x_hi = -self.plate_half - ext, self.plate_half + ext
+            for _, a, b in cuts:
+                solid -= Pos(0, 0, -EPS) * extrude(
+                    _half_plane_cutter(a, b, x_lo, x_hi, 0.0, self.plate_h + ext),
+                    plate_t + 2 * EPS,
                 )
         for hole in self.all_posts:
             x, y = hole
