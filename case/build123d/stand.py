@@ -44,8 +44,9 @@ flipped vs the KiCad view per the mounting orientation above:
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
 centroid by --set-angles (default -35 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
-it so the rotated board's lowest corner clears the base top by 2 mm
-(rotation swings a board corner below the nominal edge).
+it so the rotated board's lowest outline point (real Edge.Cuts material —
+the bbox corner holds no board) clears the base top by 2 mm, then shifts
+the whole pattern keyboard_drop down the plate (user-measured).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
@@ -116,8 +117,12 @@ SIZE_TOL = 0.5
 # --- geometry parameters (also see README) ------------------------------------
 plate_t = 6
 plate_margin = 10
-bottom_ext = 6.5  # plate below the PCB bottom edge; the solver's v_floor
-#                  keeps the board's lowest corner clear of the base top
+bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
+#                  v_floor keeps the board's lowest outline point clear of
+#                  the base top, and keyboard_drop eats most of that margin
+keyboard_drop = 28.0  # whole mounting pattern shifted DOWN the plate by this
+# much (user-measured request "键盘下移 3cm", trimmed to 28 mm so the lowest
+# post's flare and back-face nut pocket still fit above the plate bottom edge)
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -262,7 +267,8 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
 # default 20 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
-# board's lowest corner clears the base top (BASE_TOP_MARGIN).
+# board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
+# shifts the whole pattern keyboard_drop down the plate.
 SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
@@ -283,14 +289,22 @@ MIN = Align.MIN
 # ---------------------------------------------------------------------------
 
 
-def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
-    """Return (pcb_w, pcb_h, [(u, v) x4]) from a KiCad PCB file."""
+def parse_pcb(
+    path: Path,
+) -> tuple[float, float, list[tuple[float, float]], list[tuple[float, float]]]:
+    """Return (pcb_w, pcb_h, [(u, v) x4], outline) from a KiCad PCB file.
+
+    outline is the real Edge.Cuts boundary sampled at ~1 mm steps in the
+    stand frame — the solver's height constraint uses it instead of the
+    bounding box, whose corner (u = pcb_w, v = 0) holds no material.
+    """
     text = path.read_text()
 
     # Board outline: ergogen exports Edge.Cuts as gr_line/gr_arc segments
     # (arcs tessellated into short lines, so endpoints suffice for the bbox).
     xs: list[float] = []
     ys: list[float] = []
+    segs: list[tuple[tuple[float, float], tuple[float, float]]] = []
     for line in text.splitlines():
         if 'Edge.Cuts' not in line:  # KiCad writes the layer name unquoted
             continue
@@ -299,13 +313,35 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
         # start/end/center only: gr_arc "mid" points are corner-rounding
         # bulges outside the straight-edge hull, and the stand frame (like
         # the verified hole table) is anchored to the straight-edge corners.
-        for a, b in re.findall(r'\((?:start|end|center)\s+(-?[\d.]+)\s+(-?[\d.]+)', line):
-            xs.append(float(a))
-            ys.append(float(b))
+        xy = [
+            (float(a), float(b))
+            for a, b in re.findall(
+                r'\((?:start|end|center)\s+(-?[\d.]+)\s+(-?[\d.]+)', line
+            )
+        ]
+        for a, b in xy:
+            xs.append(a)
+            ys.append(b)
+        # first two tokens are (start, end) — center/mid come later in the
+        # s-expression — so this pairs each segment's endpoints correctly
+        if len(xy) >= 2:
+            segs.append((xy[0], xy[1]))
     if not xs:
         sys.exit(f'error: no Edge.Cuts geometry found in {path}')
-    pcb_h = max(xs) - min(xs)  # board height (along columns) runs along X in KiCad
-    pcb_w = max(ys) - min(ys)
+    x_min, y_max = min(xs), max(ys)
+    pcb_h = max(xs) - x_min  # board height (along columns) runs along X in KiCad
+    pcb_w = y_max - min(ys)
+
+    # Real outline samples (stand frame): interpolate each segment at ~1 mm
+    # steps. The bbox corner would overstate how low the rotated board hangs
+    # — the lowest real material (pinky/ring columns' bottom edge) sits far
+    # above it, and the whole mounting pattern rides that difference.
+    outline: list[tuple[float, float]] = []
+    for (x1, y1), (x2, y2) in segs:
+        n = max(2, round(math.hypot(x2 - x1, y2 - y1)))
+        for i in range(n + 1):
+            f = i / n
+            outline.append((y_max - (y1 + (y2 - y1) * f), x1 + (x2 - x1) * f - x_min))
 
     holes: dict[str, tuple[float, float]] = {}
     chunks = text.split('(footprint "ceoloide:mounting_hole_plated"')[1:]
@@ -337,7 +373,7 @@ def parse_pcb(path: Path) -> tuple[float, float, list[tuple[float, float]]]:
             f'vs expected {PCB_W_EXPECTED} x {PCB_H_EXPECTED}'
         )
     ordered = [holes[ref] for ref in sorted(HOLES_EXPECTED)]
-    return pcb_w, pcb_h, ordered
+    return pcb_w, pcb_h, ordered, outline
 
 
 # ---------------------------------------------------------------------------
@@ -516,6 +552,7 @@ class Stand:
         pcb_w: float,
         pcb_h: float,
         holes: list[tuple[float, float]],
+        outline: list[tuple[float, float]],
         post_h: float,
         attach: str,
         set_angles: list[float],
@@ -523,6 +560,7 @@ class Stand:
         flange_w: float = 0.0,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
+        self.outline = outline
         self.tilt = tilt
         self.post_h = post_h
         self.face_z = plate_t + post_h  # PCB seating plane over the back face
@@ -647,22 +685,18 @@ class Stand:
         """Place one 4-hole set per angle: rotate about the pattern centroid,
         then pack — each set slides laterally (brute force over a shift grid,
         also what centers a single set) and rises so that the rotated board's
-        lowest corner clears the base top and all posts keep MIN_POST_CENTER
-        apart. Optimizes for the largest minimum post distance, tie-broken by
+        lowest outline point clears the base top and all posts keep
+        MIN_POST_CENTER apart; the whole pattern then sits keyboard_drop
+        lower on the plate (user-measured "键盘下移 3cm", trimmed to 28 mm).
+        Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
         cv = sum(v for _, v in self.holes) / len(self.holes)
         rel = [(u - cu, v - cv) for u, v in self.holes]
-        corners = [
-            (-self.pcb_w / 2, -cv),
-            (self.pcb_w / 2, -cv),
-            (self.pcb_w / 2, self.pcb_h - cv),
-            (-self.pcb_w / 2, self.pcb_h - cv),
-        ]
-        # v' the lowest board corner may reach: the plate back face at that
-        # corner must stay BASE_TOP_MARGIN above the base top
+        # v' the lowest board material may reach: the plate back face under
+        # it must stay BASE_TOP_MARGIN above the base top
         # face_z = plate_t + post_h: the PCB back rides that far in front of
-        # the plate back face, so a corner's world height gains face_z * st
+        # the plate back face, so its world height gains face_z * st
         v_floor = (
             base_t + BASE_TOP_MARGIN - self.origin_z - self.face_z * self.st
         ) / self.ct - bottom_ext
@@ -675,8 +709,18 @@ class Stand:
                  cv + dx * math.sin(r) + dy * math.cos(r))
                 for dx, dy in rel
             ]
-            vmin = min(dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
-            lift = max(0.0, v_floor - (cv + vmin))
+            # constrain on real Edge.Cuts material, not the bbox corners:
+            # the lowest outline point sits ~31 mm higher along the plate
+            # than the virtual (u = pcb_w, v = 0) corner
+            vmin = min(
+                (u - cu) * math.sin(r) + (v - cv) * math.cos(r)
+                for u, v in self.outline
+            )
+            # the keyboard_drop shift lowers the pattern, so the same
+            # material needs that much more lift to hold the floor; at
+            # t30/-35 the drop already spends the whole margin and the
+            # clamp zeroes the lift
+            lift = max(0.0, v_floor - (cv + vmin) + keyboard_drop)
             lifted.append((ang, lift, [(u, v + lift) for u, v in pts]))
 
         cands = [
@@ -686,7 +730,7 @@ class Stand:
         best, best_key = None, None
         for combo in itertools.product(cands, repeat=len(angles)):
             posts = [
-                (u + s - self.pcb_w / 2, v + bottom_ext)
+                (u + s - self.pcb_w / 2, v + bottom_ext - keyboard_drop)
                 for (_, _, pts), s in zip(lifted, combo, strict=True)
                 for u, v in pts
             ]
@@ -715,12 +759,20 @@ class Stand:
         meta = []
         for (ang, lift, pts), s in zip(lifted, best, strict=True):
             r = math.radians(ang)
-            vmin = min(cv + dx * math.sin(r) + dy * math.cos(r) for dx, dy in corners)
+            vmin = min(
+                cv + (u - cu) * math.sin(r) + (v - cv) * math.cos(r)
+                for u, v in self.outline
+            )
             corner_z = (
-                self.origin_z + (bottom_ext + vmin + lift) * self.ct
+                self.origin_z
+                + (bottom_ext + vmin + lift - keyboard_drop) * self.ct
                 + self.face_z * self.st
             )
-            out.append((ang, [(u + s - self.pcb_w / 2, v + bottom_ext) for u, v in pts]))
+            out.append(
+                (ang,
+                 [(u + s - self.pcb_w / 2, v + bottom_ext - keyboard_drop)
+                  for u, v in pts])
+            )
             meta.append((ang, s, lift, round(corner_z, 2)))
         return out, meta
 
@@ -757,11 +809,15 @@ class Stand:
         """Cap the haunch height so its ridge never runs behind a post's
         back-face hardware: the screw clearance bore and, wider still, the
         nut pocket mouth (hex ~4.3 mm major radius plus wall, hence 6.5 mm
-        clear of the post center)."""
+        clear of the post center). Floored at 2 mm: below that the wedge is
+        a negligible sliver — it only softens the junction corner, the ribs
+        carry the load — so once the pattern drops (keyboard_drop) the cap
+        may shrink the haunch to nearly nothing instead of covering a
+        pocket mouth."""
         min_y = min(y for _, y in self.all_posts)
         y_top = min_y - 6.5
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
-        return max(10.0, min(haunch_h, h))
+        return max(2.0, min(haunch_h, h))
 
     # -- keyboard-plate frame helpers -----------------------------------------
 
@@ -1169,7 +1225,7 @@ def main() -> None:
     if not 0 <= args.flange <= 30:
         sys.exit('error: --flange width must be 0..30 mm')
 
-    pcb_w, pcb_h, holes = parse_pcb(args.pcb)
+    pcb_w, pcb_h, holes, outline = parse_pcb(args.pcb)
     args.out.mkdir(parents=True, exist_ok=True)
 
     def emit(part, stem: str) -> None:
@@ -1192,7 +1248,9 @@ def main() -> None:
 
     # The base is tilt- and side-independent: one Stand, one export.
     if args.part == 'base':
-        stands = [Stand(pcb_w, pcb_h, holes, args.post_h, args.attach, set_angles)]
+        stands = [
+            Stand(pcb_w, pcb_h, holes, outline, args.post_h, args.attach, set_angles)
+        ]
         stems = ['stand_base']
     else:
         # 'fit' geometry does not vary with the tilt; only build it once.
@@ -1205,6 +1263,7 @@ def main() -> None:
                     pcb_w,
                     pcb_h,
                     holes,
+                    outline,
                     args.post_h,
                     args.attach,
                     set_angles,
@@ -1228,7 +1287,8 @@ def main() -> None:
         ):
             print(
                 f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
-                f'{max(x for x, _ in pts):7.2f}]  lowest PCB corner z={corner_z:6.2f} mm'
+                f'{max(x for x, _ in pts):7.2f}]  '
+                f'lowest PCB outline point z={corner_z:6.2f} mm'
             )
         print(
             f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
