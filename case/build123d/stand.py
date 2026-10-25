@@ -1064,8 +1064,9 @@ class Stand:
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
         # trim each side back to ITS band edge; on a side whose post keep-box
-        # pokes past it, the tab grows out of the band edge through tangent
-        # quarter-round shoulders (clear of the post keep circle)
+        # pokes past it, the tab grows out of the band edge through two 45 deg
+        # straight shoulders (user sketch — two lines replace the old tangent
+        # quarter-rounds; both stay well clear of the post keep circle)
         for sx in (-1, 1):
             edge = abs(self.band_edges[sx])
             over = self.plate_half - edge
@@ -1080,17 +1081,18 @@ class Stand:
                 continue
             lo0, hi0 = spans[0]
             x_in, x_out = edge, self.plate_half
-            pts = [(x_in, 0.0), (x_in, lo0 - over)]
-            pts += [
-                (x_in + sx * over * math.cos(math.radians(t)), lo0 + over * math.sin(math.radians(t)))
-                for t in range(270 + 15, 361, 15)
+            # 45 deg straight shoulders: band edge -> tab edge -> band edge,
+            # two single lines (dx = dy = over)
+            pts = [
+                (x_in, 0.0),
+                (x_in, lo0 - over),
+                (x_out, lo0),
+                (x_out, hi0),
+                (x_in, hi0 + over),
+                (x_in, self.plate_h),
+                (x_out, self.plate_h),
+                (x_out, 0.0),
             ]
-            pts += [(x_out, hi0)]
-            pts += [
-                (x_in + sx * over * math.cos(math.radians(t)), hi0 + over * math.sin(math.radians(t)))
-                for t in range(15, 91, 15)
-            ]
-            pts += [(x_in, self.plate_h), (x_out, self.plate_h), (x_out, 0.0)]
             if sx < 0:
                 pts = [(-x, y) for x, y in reversed(pts)]
             solid -= Pos(0, 0, -EPS) * extrude(
