@@ -734,8 +734,9 @@ class Stand:
         )
         self.joint_screw_xs = [self.boot_lo + edge_need, self.boot_hi - edge_need]
         self.rib_x = self._auto_ribs()
-        if len(self.rib_x) < 2:
-            print(f'warning: only {len(self.rib_x)} ribs fit inside the boot')
+        if len(self.rib_x) + len(self.stub_ribs) < 2:
+            print(f'warning: only {len(self.rib_x) + len(self.stub_ribs)} '
+                  f'ribs (incl. stubs) fit inside the boot')
         # a post whose keep-box pokes past ITS side's band edge keeps a local
         # bulge tab instead of widening the whole part
         self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
@@ -905,6 +906,7 @@ class Stand:
         lo = self.boot_lo + 1 + rib_t / 2
         hi = self.boot_hi - 1 - rib_t / 2
         ribs: list[float] = []
+        self.stub_ribs: list[tuple[float, float]] = []  # (x, capped height)
         for x_s in self.joint_screw_xs:
             # the key bar splits the boot, so this screw's rib must stay on
             # the screw's side of it; start right inboard of the nut pocket
@@ -920,14 +922,51 @@ class Stand:
                 x += 2.0 * inb  # post hardware in the way: slide inboard
             if s_lo <= x <= s_hi:
                 ribs.append(x)
-            else:
+                continue
+            # Full-height rib doesn't fit (pocket-post hardware vs key bar):
+            # fall back to a SHORT stub at the initial inboard position
+            # (user request). The wedge tops out below any pocket mouth
+            # overlapping its x-span, so the stub backs the junction without
+            # blocking nut insertion; it need not mirror the far rib.
+            x_stub = 2 * round((x_s + inb * rib_off) / 2)
+            if not (
+                x_stub - rib_t / 2 >= self.boot_lo + 1
+                and x_stub + rib_t / 2 <= self.boot_hi - 1
+                and (x_s >= self.band_mid or x_stub + rib_t / 2 <= key_lo - 1)
+                and (x_s <= self.band_mid or x_stub - rib_t / 2 >= key_hi + 1)
+            ):
                 print(
                     f'note: no rib fits inboard of the joint screw at '
                     f'x={x_s:g} (pocket-post hardware vs key bar) — dropped'
                 )
+                continue
+            # cap: wedge apex stays 2 mm below any pocket mouth overlapping
+            # the stub's x-span (mouth bottom z = ct·(y − ac/2) on the back
+            # face; wedge apex z = ct·h + e·st above the seat)
+            h = rib_h
+            for px, py in self.all_posts:
+                if abs(px - x_stub) < rib_t / 2 + nut_pocket_ac / 2:
+                    h = min(
+                        h,
+                        (py - nut_pocket_ac / 2)
+                        - (2.0 + 1.5 * self.st) / self.ct,
+                    )
+            if h < 25:
+                print(
+                    f'note: no room for a stub rib at x={x_stub:g} either '
+                    f'(capped height {h:.1f} < 25) — dropped'
+                )
+                continue
+            h = 2 * round(h / 2)
+            self.stub_ribs.append((x_stub, h))
+            print(
+                f'note: short rib at x={x_stub:g}, h={h:g} backs the joint '
+                f'screw at x={x_s:g} (full-height rib blocked by '
+                f'pocket-post hardware)'
+            )
         # ribs must never poke outside the boot — the fit rules above
         # guarantee it; the assert keeps future keep-out edits honest
-        for rx in ribs:
+        for rx in ribs + [x for x, _ in self.stub_ribs]:
             assert (
                 rx - rib_t / 2 >= self.boot_lo + 1
                 and rx + rib_t / 2 <= self.boot_hi - 1
@@ -1386,9 +1425,9 @@ class Stand:
         # after the first print): the base rear corner reaches
         # y = rib_t + 8 = 20 from the seat origin, and the derived boot
         # rear keeps a 6 mm wall behind it.
-        for rx in self.rib_x:
+        for rx, rh in [(rx, rib_h) for rx in self.rib_x] + self.stub_ribs:
             boot += Pos(rx - rib_t / 2, 0, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
+                Plane.YZ * self._wedge(rib_t + 8, rh, rad), rib_t
             )
         # keyboard_drop can park the lowest POCKET post's back-face nut
         # pocket inside the boot's z-band (t30/-35 drop 20: mouth spans
@@ -1685,7 +1724,9 @@ def main() -> None:
         key_xs = [round(stand.band_mid + s * key_x, 1) for s in (-1, 1)]
         print(
             f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
-            f'  | haunch_h = {stand.haunch_h:.1f} mm'
+            + (f' + stubs {[(round(a, 1), round(b, 1)) for a, b in stand.stub_ribs]}'
+               if stand.stub_ribs else '')
+            + f'  | haunch_h = {stand.haunch_h:.1f} mm'
             f'  | joint: keys x = {key_xs}, '
             f'screws x = {[round(x, 1) for x in stand.joint_screw_xs]} '
             f'({joint_screw} from below)'
