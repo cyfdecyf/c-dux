@@ -25,13 +25,18 @@ Highlights over the retired OpenSCAD version:
     key bar centered on the band plus 2x M4x12 screws at the boot's outer
     edges, driven up from the open base underside into nuts in the boot.
   * Junction reinforcement survives the split: the wide haunch and the
-    back-face ribs moved onto the upright's boot.
+    back-face ribs live on the upright's boot, anchored to the backplate's
+    back face (embedded 1.5 mm along the full height) instead of the boot
+    front — whose +4.5 recess had dragged them 4.5 mm rearward, detaching
+    them from the plate they reinforce.
   * PCB held by 4 screws: 3 M4 nuts in back-face hex pockets clamp the
     board; the lowest post is self-tapped instead (Ø tap_d pilot straight
     through post + plate — after the drop its back-face pocket would sit
     inside the boot's z-band with no insertion access, and a tapped hole
-    needs none; the recessed boot front (+4.5) leaves the pilot's rear
-    exit in open air).
+    needs none). It also gets no Ø15 flare: at this drop the flare foot
+    would overhang the plate's bottom edge and be clipped into a lump —
+    a plain Ø10 wall prints fine. The haunch toe now wraps the pilot's
+    rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
     default -35 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
@@ -135,7 +140,8 @@ keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
-# none — with the boot front recessed (+4.5) the pilot exits into open air
+# none. It also gets no Ø15 flare: at this drop the flare foot would
+# overhang the plate's bottom edge and be clipped into a lump
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -224,11 +230,13 @@ key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
 boot_front = 4.5  # boot front edge, 4.5 mm behind the seat origin: the front
-#                   lip is gone entirely so the lowest post's self-tap pilot
-#                   exits into open air (H3 back face y ≈ 2.82, M4x12 tip
-#                   reaches y ≈ 4.03 → ~0.5 mm clearance past the tip); the
-#                   plate's 45° chamfered lip is self-supporting, so the
-#                   boot front never needed to underlie it anyway
+#                   lip is gone entirely (the plate's 45° chamfered lip is
+#                   self-supporting, so the boot never needed to underlie
+#                   it). ONLY the boot box tracks this constant now — the
+#                   reinforcement wedges anchor to the back face instead
+#                   (see _wedge), so recessing the front can no longer
+#                   detach them; the lowest post's pilot exit is wrapped
+#                   by the haunch toe and re-cut through it (extra bite)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
@@ -742,7 +750,7 @@ class Stand:
             max(
                 boot_rear,  # verified default: don't go slimmer than it
                 joint_screw_y + nut_pocket_ac / 2 + 1.5,  # nut-pocket wall
-                boot_front + (rib_t + 8) + 6,  # rib wall on the boot
+                (rib_t + 8) + 6,  # rib foot rear y = rib_t + 8, + 6 mm wall
             )
             / 2
         ) * 2  # even mm
@@ -1066,22 +1074,33 @@ class Stand:
                 )
         for hole in self.all_posts:
             x, y = hole
-            solid += Pos(x, y, plate_t) * (
-                Cylinder(post_d / 2, self.post_h, align=(Align.CENTER, Align.CENTER, MIN))
-                + Cone(
+            post = Pos(x, y, plate_t) * Cylinder(
+                post_d / 2, self.post_h, align=(Align.CENTER, Align.CENTER, MIN)
+            )
+            if hole != self.lowest_post:
+                # 45 deg flare (Ø15 foot ring) where the standoff meets the
+                # plate: adhesion-friendly transition, self-supporting. The
+                # lowest post stays a plain cylinder: it is self-tapped
+                # anyway, and at this drop its flare foot would overhang the
+                # plate's bottom edge (center y ~ 5.6, foot to y ~ -1.9) and
+                # get clipped into a half-trumpet lump by the y >= 0 clip
+                # below; a plain Ø10 cylinder wall prints fine.
+                post += Pos(x, y, plate_t) * Cone(
                     post_d / 2 + 2.5,
                     post_d / 2,
                     1.5,
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
-            )
-        # Flare clip: a deep pattern parks the lowest post's Ø15 flare foot
-        # past the plate's bottom edge (t30/-35 at drop 30: the unscrewed
-        # post centers at y ~ 5.6, its flare reaches y ~ -1.9). The plate
-        # itself already spans y >= 0, so intersect the finished solid with
-        # a generous y >= 0 box: any overhanging flare is trimmed flush
-        # with the plate's bottom edge — a straight vertical clip face,
-        # printable; the post top's bearing area is untouched.
+            solid += post
+        # Flare clip: a deep pattern can park a post's Ø15 flare foot past
+        # the plate's bottom edge (t30/-35 at drop 30: the lowest post
+        # centers at y ~ 5.6, its flare would reach y ~ -1.9 — that post
+        # gets no flare at all now, see above, so this only backstops other
+        # layouts/tilts). The plate itself already spans y >= 0, so
+        # intersect the finished solid with a generous y >= 0 box: any
+        # overhanging flare is trimmed flush with the plate's bottom edge —
+        # a straight vertical clip face, printable; the post top's bearing
+        # area is untouched.
         solid &= Pos(-self.plate_half - 20, 0, -20) * Box(
             self.plate_w + 40,
             self.plate_h + 20,
@@ -1095,9 +1114,11 @@ class Stand:
                 # Lowest post: self-tapping pilot straight through post +
                 # plate. A nut pocket here would sit inside the boot's
                 # z-band (unreachable), and a tapped hole needs no back-face
-                # access — the boot front is recessed (+4.5), so the M4
-                # screw tip (~y 4.03) clears the boot face by ~0.5 mm and
-                # the exit sits in open air.
+                # access. The haunch toe now wraps the exit (back face
+                # y ~ 2.82; the toe spans y 0.6..4.5 near the seat at every
+                # x): the re-cut below keeps the bore open, and the M4 tip
+                # (~y 4.03) threads ~1 mm into that toe plastic — extra
+                # bite, by design.
                 solid -= Pos(x, y, -EPS) * Cylinder(
                     tap_d / 2,
                     top + 2 * EPS,
@@ -1217,16 +1238,21 @@ class Stand:
             base_t + boot_h / 2,
         ) * Box(boot_w, self.boot_rear - boot_front, boot_h)
         # Boot-wide haunch: a shallow ramp up the back face that tops out
-        # just above the boot (haunch_h), filling the junction inner corner.
-        boot += Pos(self.boot_lo, boot_front, base_t) * extrude(
+        # just above the boot (haunch_h), filling the junction inner
+        # corner. y anchor 0 = the backplate's back face; the wedge
+        # polygon supplies the 1.5 mm embed (see _wedge) — it must NOT
+        # track boot_front, or a recessed front leaves it floating clear
+        # of the plate.
+        boot += Pos(self.boot_lo, 0, base_t) * extrude(
             Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), boot_w
         )
-        # Ribs continue up the back face into the hammering zone. Wedge
-        # base depth rib_t + 8 (slimmed from +18 after the first print):
-        # the base reaches y = boot_front + rib_t + 8, and the derived
-        # boot rear keeps a 6 mm wall behind the feet.
+        # Ribs continue up the back face into the hammering zone, same
+        # back-face anchor. Wedge base depth rib_t + 8 (slimmed from +18
+        # after the first print): the base rear corner reaches
+        # y = rib_t + 8 = 20 from the seat origin, and the derived boot
+        # rear keeps a 6 mm wall behind it.
         for rx in self.rib_x:
-            boot += Pos(rx - rib_t / 2, boot_front, base_t) * extrude(
+            boot += Pos(rx - rib_t / 2, 0, base_t) * extrude(
                 Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
             )
         # keyboard_drop can park the lowest POCKET post's back-face nut
@@ -1253,11 +1279,11 @@ class Stand:
             body += self._breakaway_flange()
         body -= joint_grooves(self.band_mid)
         body -= joint_nut_pockets(self.joint_screw_xs)
-        # Re-cut the lowest post's self-tap pilot. A guard now: at the
-        # default layout the recessed boot front (+4.5) no longer reaches
-        # the pilot's rear exit (back face y ~ 2.82), but other configs
-        # (deeper drop, lower tilt) could still park boot material over
-        # it — there the boot union would refill the bore, so cut again.
+        # Re-cut the lowest post's self-tap pilot through whatever the boot
+        # union added around its rear exit — by design since the haunch toe
+        # now wraps the exit (thread bite in that plastic), and as a guard
+        # for other configs (deeper drop, lower tilt) whose boot would
+        # otherwise refill the bore.
         x, y = self.lowest_post
         body -= (
             Pos(0, 0, self.origin_z)
@@ -1275,14 +1301,38 @@ class Stand:
         return body
 
     def _wedge(self, depth: float, height: float, rad: float):
-        # Profile in the YZ plane: base along the seat plane, apex up the
-        # tilted backplate's back face; anchor edges sit inside the
-        # solids so the union fuses cleanly, and every face is
-        # support-free as printed.
+        """Reinforcement wedge profile in the YZ plane, anchored to the
+        backplate's BACK FACE, not the boot front (anchoring at the recessed
+        boot front (+4.5) had dragged rib and haunch ~4.5 mm rearward: they
+        connected only via the boot and reinforced nothing). The caller
+        positions at Pos(x, 0, base_t), so local (0, 0) is world
+        (Y = 0, Z = base_t) and the tilted back face is the line
+        Y = tan(tilt) * Z. Triangle, with e the perpendicular embed:
+            P1 = (-e / cos, 0)             foot of the embed leg
+            P2 = (height * sin - e * cos,
+                  height * cos + e * sin)  apex up the back face
+            P3 = (depth, 0)                base rear corner, on the seat
+        P1-P2 runs parallel to the back face, e = 1.5 mm perpendicular
+        inside it: full-height contact with the plate regardless of
+        boot_front. P1 is slid e / cos along the seat plane so the base
+        edge lies flat ON it — over the boot aft of y = 4.5, and on the
+        bed across the ~1.7 mm strip in front of the 45 deg lip chamfer
+        (first-layer material; the face above leans back at tilt from
+        vertical, self-supporting). Putting P1 at the perpendicular foot
+        instead (e * sin up) would float that strip's base edge over the
+        recessed boot-front pocket. The hypotenuse faces up-forward
+        throughout (rib: leans back ~12.6 deg from vertical; haunch:
+        ~49 deg ramp), so the wedge prints support-free; the rib's
+        protrusion past the back face tapers from ~17 mm at the boot top
+        (z = 14) to 0 at z ~ 62 — the top few mm of the wedge submerge
+        into the plate, intended.
+        """
+        e = 1.5  # perpendicular embed into the backplate
+        s, c = math.sin(rad), math.cos(rad)
         return Polygon(
-            (0, 0),
+            (-e / c, 0),
             (depth, 0),
-            (height * math.sin(rad), height * math.cos(rad)),
+            (height * s - e * c, height * c + e * s),
             align=None,
         )
 
