@@ -1063,10 +1063,15 @@ class Stand:
             )
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
+        trimmed = self._top_corner_cuts()
         # trim each side back to ITS band edge; on a side whose post keep-box
         # pokes past it, the tab grows out of the band edge through two 45 deg
         # straight shoulders (user sketch — two lines replace the old tangent
-        # quarter-rounds; both stay well clear of the post keep circle)
+        # quarter-rounds). The lower shoulder sits SYMMETRIC to the
+        # top-corner cut line's crossing above the boss: the edge margin
+        # below the flare ring mirrors the ring's overhang past that
+        # crossing (user follow-up sketch), with a keep-clear guard for the
+        # ring (2 mm beyond its radius, 45 deg line).
         for sx in (-1, 1):
             edge = abs(self.band_edges[sx])
             over = self.plate_half - edge
@@ -1081,12 +1086,26 @@ class Stand:
                 continue
             lo0, hi0 = spans[0]
             x_in, x_out = edge, self.plate_half
-            # 45 deg straight shoulders: band edge -> tab edge -> band edge,
-            # two single lines (dx = dy = over)
+            # 45 deg straight shoulders. Junction j: raised from the keep-box
+            # bottom until the edge below the boss mirrors the ring's
+            # overhang past the top-corner cut line crossing (j = 2*y_post −
+            # y_cross); clamped to the keep-box top and to a 2 mm clearance
+            # from the flare ring along the 45 deg line.
+            y_post = (lo0 + hi0) / 2  # boss center of the poking post
+            j = lo0
+            if trimmed is not None:
+                _, cuts_, _ = trimmed
+                a, b = cuts_['left' if sx < 0 else 'right']
+                y_cross = a[1] + (x_out - a[0]) * (b[1] - a[1]) / (b[0] - a[0])
+                j = max(lo0, min(
+                    2 * y_post - y_cross,
+                    hi0,
+                    y_post + over - (post_d / 2 + 4.5) * math.sqrt(2),
+                ))
             pts = [
                 (x_in, 0.0),
-                (x_in, lo0 - over),
-                (x_out, lo0),
+                (x_in, j - over),
+                (x_out, j),
                 (x_out, hi0),
                 (x_in, hi0 + over),
                 (x_in, self.plate_h),
@@ -1117,7 +1136,6 @@ class Stand:
         # walks a nut pocket into a line. Line math lives in
         # _top_corner_cuts (shared with _taper_outline, whose hull is kept
         # outboard of these lines — see the anchor note there).
-        trimmed = self._top_corner_cuts()
         if trimmed is not None:  # only when the roof is actually tapered
             y0, cuts, normals = trimmed
             top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
