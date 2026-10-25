@@ -179,18 +179,6 @@ pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
 #                     thickness tolerance — TPU compression at keyboard
 #                     loads is microns, the tolerance is the driver
 pad_recess = pad_t - pad_protrude  # 0.6 pocket depth
-pad_seat_w = 4.0  # slot-centerline radius inside the capture wall: the
-#                   glue floor runs from the wall in to the relief slot
-pad_slot_w = 1.0  # relief slot between seat ring and center disk: splits
-#                   the print-time ceiling into two small arc bridges (the
-#                   full-flat floor sagged badly in the first print). The
-#                   TPU pad spans the 1-mm slot, so the whole pocket floor
-#                   stays flat adhesive area — no crest pokes into it.
-pad_slot_d = 1.0  # slot depth: 0.4 above the floor; its 1-mm-wide roof
-#                   bridge hides under the pad
-pad_slot_land = 3.0  # two glue lands interrupt the slot (at ±y of each
-#                      pad): they anchor the center disk to the seat ring,
-#                      so its ceiling cannot air-start as an island
 pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              as this allows — the tip-over pivots are the PAD contact lines,
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
@@ -1110,44 +1098,17 @@ class Stand:
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
-            # Pad pocket: capture wall at pad_d + 2*pad_fit, then a flat
-            # glue floor one pad_recess deep — the pad bottoms flat, so
-            # everything inside the wall is adhesive area. The relief slot
-            # splits the print-time ceiling into two small arc bridges (a
-            # full-flat floor sagged badly in the first print); two glue
-            # lands anchor the center disk so nothing starts in air. The
-            # pad spans slot and lands alike.
+            # Pad pocket: flat-bottomed, straight capture wall at
+            # pad_d + 2*pad_fit, glue floor one pad_recess deep — the pad
+            # bottoms flat over the whole pocket. A former relief slot +
+            # glue lands kept the ceiling from sagging, but the lands stood
+            # 0.4 mm proud of the floor and kept the pad from seating; the
+            # plain ceiling is one 20.4 mm bridge whose droop (if any) is
+            # absorbed by the pad's 0.4 mm compression.
             ro = pad_d / 2 + pad_fit
-            ri = ro - pad_seat_w
             pocket = Pos(px, py, -EPS) * Cylinder(
                 ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
-            ) - Pos(px, py, -EPS) * Cylinder(
-                ri, pad_recess + 3 * EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
-            pocket += Pos(px, py, -EPS) * Cylinder(
-                ri - pad_slot_w / 2,
-                pad_recess + 2 * EPS,
-                align=(Align.CENTER, Align.CENTER, MIN),
-            )
-            pocket += Pos(px, py, -EPS) * (
-                Cylinder(
-                    ri + pad_slot_w / 2,
-                    pad_slot_d + EPS,
-                    align=(Align.CENTER, Align.CENTER, MIN),
-                )
-                - Cylinder(
-                    ri - pad_slot_w / 2,
-                    pad_slot_d + 2 * EPS,
-                    align=(Align.CENTER, Align.CENTER, MIN),
-                )
-            )
-            for sy in (-1, 1):
-                pocket -= Pos(px, py + sy * ri, -EPS) * Box(
-                    pad_slot_land,
-                    pad_slot_w + 0.4,
-                    pad_slot_d + 3 * EPS,
-                    align=(Align.CENTER, Align.CENTER, MIN),
-                )
             base -= pocket
         base += joint_keys()
         base -= joint_screw_bores() + joint_screw_head_pockets()
