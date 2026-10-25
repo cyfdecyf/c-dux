@@ -189,10 +189,19 @@ haunch_d = 12  # full-width haunch: depth along the seat plane (was 18;
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
-rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
+rib_t = 14  # rib thickness (X); rib x-positions are solved automatically to
 #            clear every post AND the joint hardware; widened 8 -> 12
-#            because the 30/-35 post layout only fits two ribs
+#            (30/-35 layout) then -> 14 for ~+15% root section at +2 cm3 —
+#            the last even step that fits: at 16 the left stub slides to
+#            x=-30 and its flank crosses the key-bar keep-out (drops)
 rib_h = 70  # rib height up the back face (was 60)
+rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
+#            20): depth buys ~3x more root section than thickness at the
+#            max-moment foot; rear corner y = 26 still leaves an 8 mm wall
+#            to the derived boot rear (min 6) and the slope stays < 30 deg
+#            from vertical, self-supporting
+rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
+#            tip printed fragile and carries no load up there anyway
 pad_d = 20
 pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
 #                separate from the joint_clear key fit below)
@@ -788,7 +797,7 @@ class Stand:
             max(
                 boot_rear,  # verified default: don't go slimmer than it
                 joint_screw_y + nut_pocket_ac / 2 + 1.5,  # nut-pocket wall
-                (rib_t + 8) + 6,  # rib foot rear y = rib_t + 8, + 6 mm wall
+                rib_foot + 6,  # rib foot rear y = rib_foot, + 6 mm wall
             )
             / 2
         ) * 2  # even mm
@@ -1455,13 +1464,16 @@ class Stand:
             Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), boot_w
         )
         # Ribs continue up the back face into the hammering zone, same
-        # back-face anchor. Wedge base depth rib_t + 8 (slimmed from +18
-        # after the first print): the base rear corner reaches
-        # y = rib_t + 8 = 20 from the seat origin, and the derived boot
-        # rear keeps a 6 mm wall behind it.
+        # back-face anchor. Wedge base depth rib_foot (first print wanted
+        # the foot slim, but the max-moment root buys more from depth than
+        # from thickness): the base rear corner reaches y = rib_foot = 26
+        # from the seat origin, and the derived boot rear keeps a 6 mm
+        # wall behind it. Apex truncated to rib_top_flat — the zero-width
+        # tip printed fragile and adds no stiffness there.
         for rx, rh in [(rx, rib_h) for rx in self.rib_x] + self.stub_ribs:
             boot += Pos(rx - rib_t / 2, 0, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 8, rh, rad), rib_t
+                Plane.YZ * self._wedge(rib_foot, rh, rad, rib_top_flat),
+                rib_t,
             )
         # keyboard_drop can park the lowest POCKET post's back-face nut
         # pocket inside the boot's z-band (t30/-35 drop 20: opening spans
@@ -1483,6 +1495,7 @@ class Stand:
                 align=(Align.MIN, Align.MIN, MIN),
             )
         body += boot
+        body = self._fillet_rib_seams(body)
         if self.flange_w > 0:
             body += self._breakaway_flange()
         body -= joint_grooves(self.band_mid)
@@ -1508,7 +1521,8 @@ class Stand:
         body -= Pos(0, 0, base_t - 25) * Box(400, 400, 50)
         return body
 
-    def _wedge(self, depth: float, height: float, rad: float):
+    def _wedge(self, depth: float, height: float, rad: float,
+               top_flat: float = 0.0):
         """Reinforcement wedge profile in the YZ plane, anchored to the
         backplate's BACK FACE, not the boot front (anchoring at the recessed
         boot front (+4.5) had dragged rib and haunch ~4.5 mm rearward: they
@@ -1537,12 +1551,75 @@ class Stand:
         """
         e = 1.5  # perpendicular embed into the backplate
         s, c = math.sin(rad), math.cos(rad)
-        return Polygon(
-            (-e / c, 0),
-            (depth, 0),
-            (height * s - e * c, height * c + e * s),
-            align=None,
-        )
+        p1 = (-e / c, 0)
+        p3 = (depth, 0)
+        p2 = (height * s - e * c, height * c + e * s)
+        if 0 < top_flat < depth + e / c - 0.5:
+            # truncate the knife apex with a flat ~top_flat wide, parallel
+            # to the base (horizontal in print pose): same width would be
+            # approached only in the last fractional layers anyway
+            zc = p2[1] * (1 - top_flat / (depth + e / c))
+            f = zc / p2[1]
+            p1t = (p1[0] + (p2[0] - p1[0]) * f, zc)
+            p3t = (p3[0] + (p2[0] - p3[0]) * f, zc)
+            return Polygon(p1, p3, p3t, p1t, align=None)
+        return Polygon(p1, p3, p2, align=None)
+
+    def _rib_seam(self, body, xf):
+        """The rib-flank / back-face seam edge at flank x = xf, or None.
+        Geometric selection (flank X, long, parallel to the plate's up
+        direction (0, st, ct)): the haunch-ramp and boot-ledge junctions
+        at the same X fail these tests, as do the top-corner cut edges."""
+        for e in body.edges():
+            vs = e.vertices()
+            if len(vs) != 2:
+                continue
+            (x1, y1, z1), (x2, y2, z2) = [(v.X, v.Y, v.Z) for v in vs]
+            dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
+            ln = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if ln < 10 or abs(dx) / ln > 0.05:
+                continue
+            if abs(dy * self.st + dz * self.ct) / ln < 0.99:
+                continue
+            if abs(x1 - xf) < 0.3 and abs(x2 - xf) < 0.3:
+                return e
+        return None
+
+    def _fillet_rib_seams(self, body):
+        """Concave fillet down each rib flank's seam with the backplate's
+        back face: hammering loads concentrate at those vertical corners,
+        and the fillet both softens the concentration and adds root
+        section. The seams only exist after the boot union, so this runs
+        on the merged body. Concave and parallel to the layer stack:
+        prints support-free. OCC refuses simultaneous fillets on disjoint
+        seams even where each succeeds alone, so they are done one flank
+        at a time, backing the radius off on refusal (same policy as the
+        cut-line corners); a flank that fails everywhere stays sharp — a
+        lost refinement, not a regression."""
+        flanks = [
+            rx + w
+            for rx, _ in [(x, rib_h) for x in self.rib_x] + self.stub_ribs
+            for w in (-rib_t / 2, rib_t / 2)
+        ]
+        radii = []
+        for xf in flanks:
+            for r in (3.0, 2.5, 2.0, 1.5):
+                seam = self._rib_seam(body, xf)
+                if seam is None:
+                    break  # no seam at this flank (layout change) — skip
+                try:
+                    body = fillet([seam], r)
+                    radii.append(r)
+                    break
+                except Exception:
+                    continue
+        if len(radii) == len(flanks):
+            rs = '/'.join(f'{r:g}' for r in sorted(set(radii)))
+            print(f'note: rib seam fillet r={rs} ({len(radii)} seams)')
+        else:
+            print(f'warning: rib seam fillet on {len(radii)}/{len(flanks)} '
+                  f'seams only — rest left sharp')
+        return body
 
     def _breakaway_flange(self):
         """Thin ring around the boot footprint (--flange): bed-adhesion
