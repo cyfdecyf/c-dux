@@ -50,8 +50,9 @@ HALO = 'stroke="#fff" stroke-width="4" paint-order="stroke"'
 
 def geometry() -> dict:
     """Every drawn number, derived from stand.py (and the v2.0 PCB)."""
-    pcb_w, pcb_h, holes = st.parse_pcb(st.DEFAULT_PCB)
-    s = st.Stand(pcb_w, pcb_h, holes, POST_H, 'nut', st.SET_ANGLES, st.TILT)
+    pcb_w, pcb_h, holes, _outline = st.parse_pcb(st.DEFAULT_PCB)
+    s = st.Stand(pcb_w, pcb_h, holes, _outline, POST_H, 'nut', st.SET_ANGLES,
+                 st.TILT)
 
     tilt = math.radians(s.tilt)
     sn, ct = math.sin(tilt), math.cos(tilt)
@@ -69,12 +70,14 @@ def geometry() -> dict:
     com_z = (m_b * c_b.Z + m_u * c_u.Z + M_KB * kb_z) / m_tot
 
     return {
-        'bx': s.bx, 'y_front': s.y0, 'y_rear': s.y1,
+        'bx': s.bx, 'bx_lo': s.band_lo, 'bx_hi': s.band_hi,
+        'y_front': s.y0, 'y_rear': s.y1,
         'pads': pads, 'pad_d': st.pad_d,
         'pad_f': min(y for _, y in pads), 'pad_r': max(y for _, y in pads),
         'key_x': st.key_x, 'key_l': st.key_l,
+        'key_xs': [s.band_mid + sx * st.key_x for sx in (-1, 1)],
         'key_y0': st.key_y0, 'key_y1': st.key_y1,
-        'js_x': st.joint_screw_x, 'js_y': st.joint_screw_y,
+        'js_xs': s.joint_screw_xs, 'js_y': st.joint_screw_y,
         'pocket_r': st.head_pocket_d / 2, 'bore_r': st.joint_screw_d / 2,
         'tilt': s.tilt, 'sn': sn, 'ct': ct,
         'plate_w': s.plate_w, 'plate_h': s.plate_h, 'plate_t': st.plate_t,
@@ -133,25 +136,28 @@ def dim_v(x, y1, y2, label, color='#333') -> str:
 # ---------------------------------------------------------------- panels
 
 def top_view(g: dict) -> str:
+    # the slab IS the (asymmetric) band footprint: draw it from bx_lo to
+    # bx_hi, not centered on 0
     bx, y_front, y_rear = g['bx'], g['y_front'], g['y_rear']
+    bx_lo, bx_hi = g['bx_lo'], g['bx_hi']
     ox, oy = O_TOP
 
     def t(x, y):
         return (ox + x * S_TOP, oy + (y_rear - y) * S_TOP)
 
     e: list[str] = []
-    bl, bt = t(-bx / 2, y_rear)
+    bl, bt = t(bx_lo, y_rear)
     bh, bw = (y_rear - y_front) * S_TOP, bx * S_TOP
     e.append(f'<clipPath id="board"><rect x="{bl}" y="{bt}" width="{bw}" '
              f'height="{bh}" rx="{10 * S_TOP}"/></clipPath>')
     e.append(f'<rect x="{bl}" y="{bt}" width="{bw}" height="{bh}" '
              f'rx="{10 * S_TOP}" fill="#fff" stroke="#222" stroke-width="2.5"/>')
-    zx, zy = t(-bx / 2, 0)
+    zx, zy = t(bx_lo, 0)
     e.append(f'<g clip-path="url(#board)">'
              f'<rect x="{bl}" y="{zy}" width="{bw}" height="{zy - bt}" '
              f'fill="#3498db" opacity="0.10"/>'
              f'<rect x="{bl}" y="{zy}" width="{bw}" '
-             f'height="{t(-bx / 2, y_front)[1] - zy}" '
+             f'height="{t(bx_lo, y_front)[1] - zy}" '
              f'fill="#e74c3c" opacity="0.10"/></g>')
 
     # keyboard + upright plan projection (board leans back, plate flush)
@@ -168,7 +174,7 @@ def top_view(g: dict) -> str:
     # pad contact lines = the tip-over pivots
     for yy, lbl, c in [(g['pad_f'], '前垫线 = 前倾支点', '#777'),
                        (g['pad_r'], '后垫线 = 后倾支点 ★', '#c0392b')]:
-        a, b = t(-bx / 2 - 25, yy), t(bx / 2 + 4, yy)
+        a, b = t(bx_lo - 25, yy), t(bx_hi + 4, yy)
         e.append(ln(a[0], a[1], b[0], b[1], c, 1.8, '8 5'))
         e.append(txt(6, a[1] - 3, lbl, 14, c))
     for px_, py_ in g['pads']:
@@ -178,24 +184,25 @@ def top_view(g: dict) -> str:
                  f'fill-opacity="0.9"/>')
 
     # joint: shear keys + M4 screws (with head-pocket circles)
-    for sx in (-1, 1):
-        a = t(sx * g['key_x'] - g['key_l'] / 2, g['key_y1'])
-        b = t(sx * g['key_x'] + g['key_l'] / 2, g['key_y0'])
+    for kx in g['key_xs']:
+        a = t(kx - g['key_l'] / 2, g['key_y1'])
+        b = t(kx + g['key_l'] / 2, g['key_y0'])
         e.append(f'<rect x="{a[0]}" y="{a[1]}" width="{b[0] - a[0]}" '
                  f'height="{b[1] - a[1]}" fill="#fff" stroke="#222" '
                  f'stroke-width="1.5"/>')
-        c = t(sx * g['js_x'], g['js_y'])
+    for js_x in g['js_xs']:
+        c = t(js_x, g['js_y'])
         e.append(f'<circle cx="{c[0]}" cy="{c[1]}" '
                  f'r="{g["bore_r"] * S_TOP}" fill="#222"/>')
         e.append(f'<circle cx="{c[0]}" cy="{c[1]}" '
                  f'r="{g["pocket_r"] * S_TOP}" fill="none" stroke="#222" '
                  f'stroke-dasharray="3 3"/>')
-    p = t(g['key_x'] + g['key_l'] / 2 + 4, 21)
+    p = t(max(g['key_xs']) + g['key_l'] / 2 + 4, 21)
     e.append(txt(p[0], p[1], '榫键×2 / M4×2（底座↔立板接头）',  # noqa: RUF001
                  13, halo=True))
 
     # seat origin
-    a, b = t(-bx / 2, 0), t(bx / 2, 0)
+    a, b = t(bx_lo, 0), t(bx_hi, 0)
     e.append(ln(a[0], a[1], b[0], b[1], '#222', 2, '2 4'))
     e.append(ln(a[0] + 3, a[1] + 1, 150, 462, '#222', 0.8, '3 3'))
     e.append(txt(156, 466, 'y=0 座面原点（立板/键盘安装参考线）', 14))
@@ -218,14 +225,14 @@ def top_view(g: dict) -> str:
                  halo=True))
 
     # dimensions
-    xa = t(bx / 2 + 14, 0)[0]
+    xa = t(bx_hi + 14, 0)[0]
     xa2 = xa + 95
-    xd = t(-bx / 2 - 15, 0)[0]
+    xd = t(bx_lo - 15, 0)[0]
     for yy, off in [(0, 14), (y_front, 14), (y_rear, 109)]:
-        p1, p2 = t(bx / 2, yy), t(bx / 2 + off, yy)
+        p1, p2 = t(bx_hi, yy), t(bx_hi + off, yy)
         e.append(ln(p1[0], p1[1], p2[0], p2[1], '#333', 0.8, '3 3'))
     for yy in (y_front, y_rear):
-        p1, p2 = t(-bx / 2, yy), t(-bx / 2 - 15, yy)
+        p1, p2 = t(bx_lo, yy), t(bx_lo - 15, yy)
         e.append(ln(p1[0], p1[1], p2[0], p2[1], '#333', 0.8, '3 3'))
     e.append(dim_v(xa, t(0, y_front)[1], t(0, 0)[1],
                    f'base_front = {-y_front:g}'))
