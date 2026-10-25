@@ -217,7 +217,9 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-boot_front = -2  # boot front edge — behind the plate front face at the seat
+boot_front = 2  # boot front edge: 2 mm BEHIND the seat origin — no front lip;
+#                 the plate's 45° chamfered lip meets the base top directly
+#                 (the chamfer is self-supporting, the boot never carried it)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
@@ -1162,8 +1164,8 @@ class Stand:
         )
         if lip_chamfer > 0:
             # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
-            # Applied before the boot union: the cut plane starts at the
-            # plate's seat-plane corner, inside the boot footprint, so the
+            # Applied before the boot union: the cut spans world y <= 0,
+            # entirely in front of the boot footprint (front +2), so the
             # boot itself is untouched.
             body -= (
                 Pos(-(self.plate_w + 20) / 2, 0, 0)
