@@ -182,7 +182,7 @@ rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
 #            because the 30/-35 post layout only fits two ribs
 rib_h = 70  # rib height up the back face (was 60)
 pad_d = 20
-pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia;
+pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
 #                separate from the joint_clear key fit below)
 pad_t = 1.0  # purchased self-adhesive TPU pad thickness
 pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
@@ -190,6 +190,12 @@ pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
 #                     thickness tolerance — TPU compression at keyboard
 #                     loads is microns, the tolerance is the driver
 pad_recess = pad_t - pad_protrude  # 0.6 pocket depth
+pad_ring_w = 5  # flat glue annulus at pad_recess; the centre is relieved
+#                pad_relief deeper, so droop/fall strands from the recess
+#                ceiling land in the relief, never under the pad's glue ring
+pad_relief = 1.0  # centre-recess headroom below the glue ring plane: the
+#                  recess ceiling is a short Ø10.2 bridge (was Ø20.4) and
+#                  its strands stop 1 mm short of the pad back
 pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              as this allows — the tip-over pivots are the PAD contact lines,
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
@@ -1248,18 +1254,29 @@ class Stand:
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
-            # Pad pocket: flat-bottomed, straight capture wall at
-            # pad_d + 2*pad_fit, glue floor one pad_recess deep — the pad
-            # bottoms flat over the whole pocket. A former relief slot +
+            # Pad pocket, two levels: a flat glue annulus (width pad_ring_w)
+            # at pad_recess inside the straight capture wall at
+            # pad_d + 2*pad_fit, plus a centre relief pad_relief deeper
+            # (vertical step — a narrowing cone would add a 45° overhang
+            # per layer where a hole wall is free). A former relief slot +
             # glue lands kept the ceiling from sagging, but the lands stood
-            # 0.4 mm proud of the floor and kept the pad from seating; the
-            # plain ceiling is one 20.4 mm bridge whose droop (if any) is
-            # absorbed by the pad's 0.4 mm compression.
+            # 0.4 mm proud of the floor and kept the pad from seating —
+            # here the glue ring IS the floor, flush everywhere. Droop or
+            # detached strands from the recess ceiling fall through the
+            # relief and out of the pocket mouth instead of onto the glue
+            # face; the ring itself is a wall-anchored cantilever whose
+            # droop bends into the relief, away from the pad.
             ro = pad_d / 2 + pad_fit
             pocket = Pos(px, py, -EPS) * Cylinder(
                 ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
             base -= pocket
+            relief = Pos(px, py, -EPS) * Cylinder(
+                ro - pad_ring_w,
+                pad_recess + pad_relief + EPS,
+                align=(Align.CENTER, Align.CENTER, MIN),
+            )
+            base -= relief
         base += joint_keys(self.band_mid)
         base -= joint_screw_bores(self.joint_screw_xs)
         base -= joint_screw_head_pockets(self.joint_screw_xs)
