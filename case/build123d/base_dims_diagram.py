@@ -75,8 +75,9 @@ def geometry() -> dict:
         'pads': pads, 'pad_d': st.pad_d,
         'pad_f': min(y for _, y in pads), 'pad_r': max(y for _, y in pads),
         'key_x': st.key_x, 'key_l': st.key_l,
+        'key_xs': [s.band_mid + sx * st.key_x for sx in (-1, 1)],
         'key_y0': st.key_y0, 'key_y1': st.key_y1,
-        'js_x': st.joint_screw_x, 'js_y': st.joint_screw_y,
+        'js_xs': s.joint_screw_xs, 'js_y': st.joint_screw_y,
         'pocket_r': st.head_pocket_d / 2, 'bore_r': st.joint_screw_d / 2,
         'tilt': s.tilt, 'sn': sn, 'ct': ct,
         'plate_w': s.plate_w, 'plate_h': s.plate_h, 'plate_t': st.plate_t,
@@ -183,19 +184,20 @@ def top_view(g: dict) -> str:
                  f'fill-opacity="0.9"/>')
 
     # joint: shear keys + M4 screws (with head-pocket circles)
-    for sx in (-1, 1):
-        a = t(sx * g['key_x'] - g['key_l'] / 2, g['key_y1'])
-        b = t(sx * g['key_x'] + g['key_l'] / 2, g['key_y0'])
+    for kx in g['key_xs']:
+        a = t(kx - g['key_l'] / 2, g['key_y1'])
+        b = t(kx + g['key_l'] / 2, g['key_y0'])
         e.append(f'<rect x="{a[0]}" y="{a[1]}" width="{b[0] - a[0]}" '
                  f'height="{b[1] - a[1]}" fill="#fff" stroke="#222" '
                  f'stroke-width="1.5"/>')
-        c = t(sx * g['js_x'], g['js_y'])
+    for js_x in g['js_xs']:
+        c = t(js_x, g['js_y'])
         e.append(f'<circle cx="{c[0]}" cy="{c[1]}" '
                  f'r="{g["bore_r"] * S_TOP}" fill="#222"/>')
         e.append(f'<circle cx="{c[0]}" cy="{c[1]}" '
                  f'r="{g["pocket_r"] * S_TOP}" fill="none" stroke="#222" '
                  f'stroke-dasharray="3 3"/>')
-    p = t(g['key_x'] + g['key_l'] / 2 + 4, 21)
+    p = t(max(g['key_xs']) + g['key_l'] / 2 + 4, 21)
     e.append(txt(p[0], p[1], '榫键×2 / M4×2（底座↔立板接头）',  # noqa: RUF001
                  13, halo=True))
 

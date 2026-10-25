@@ -17,9 +17,10 @@ Highlights over the retired OpenSCAD version:
     footprint (derived from the post layout) and the boot matches it
     edge-for-edge, so nothing protrudes sideways past the plate band. The
     upright (backplate + posts + boot foot) is printed per tilt angle; the
-    slab only needs a reprint when a layout change moves the band or the
-    ±joint_screw_x bores. The joint is two shear keys plus 2x M4x12 screws
-    driven up from the open base underside into nuts seated in the boot.
+    slab only needs a reprint when a layout change moves the band — the
+    joint screws, keys and ribs all derive from it. The joint is a merged
+    key bar centered on the band plus 2x M4x12 screws at the band's outer
+    edges, driven up from the open base underside into nuts in the boot.
   * Junction reinforcement survives the split: the wide haunch and the
     back-face ribs moved onto the upright's boot.
   * PCB held by 4 screws: 3 M4 nuts in back-face hex pockets clamp the
@@ -171,8 +172,8 @@ rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
 #            because the 30/-35 post layout only fits two ribs
 rib_h = 70  # rib height up the back face (was 60)
 pad_d = 20
-pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia,
-#                same baseline as joint_clear)
+pad_fit = 0.2  # radial install clearance at the pocket mouth (0.4 on dia;
+#                separate from the joint_clear key fit below)
 pad_t = 1.0  # purchased self-adhesive TPU pad thickness
 pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
 #                     desk contact (the tip-over pivots) across die-cut
@@ -198,12 +199,17 @@ base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
 #             current working default: 30 deg with SET_ANGLES [-35]
-joint_clear = 0.4  # mating clearance per face (README tolerance baseline)
+joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
+#                    (halved from the old 0.4 baseline — less slop on the
+#                    merged key bar; print a --part joint coupon FIRST to
+#                    verify the tighter fit before ordering full parts)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
 key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
 #             top plane, never bottoming out on the keys
-key_x = 12  # key centerline |x|; keys span y ∈ (key_y0, key_y1)
+key_x = 12  # key centerline offset from the BAND MID (band_mid ± key_x —
+#            the band is asymmetric, so mid-boot anchoring keeps the merged
+#            key bar centered); keys span y ∈ (key_y0, key_y1)
 key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
@@ -228,12 +234,11 @@ flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
 joint_screw_d = 4.5  # M4 clearance through boot + base — the printed and
 #                     assembled reference; 31bef39's +0.2 oversize never
 #                     printed and was reverted with the rest of it
-joint_screw_x = 35  # inboard on the narrowed boot: the boot now matches the
-#                    bottom-band footprint, and ±58 would need boot material
-#                    past the band edge. |x| 30.7 (nut pocket wall) still
-#                    clears the key grooves at ±27.4 by 3.3 mm, and the ribs'
-#                    own keep-out (±46.3) stays clear of the in-band posts.
-#                    The base reprint moves its bores/head pockets to match.
+# joint screw |x| is DERIVED per layout (see Stand.__init__): the two
+# screws hug the bottom band's outer edges — the widest possible lever
+# against pull-out — leaving the keys centered on the boot in between.
+# History: ±58 on the old full-width boot, then ±35 inboard once the boot
+# matched the band; now band_edge ∓ (nut pocket + 1.5 mm wall).
 joint_screw_y = 14.5
 # Screw direction: the nuts live in the BOOT, the screws come up from the
 # open base underside. The first draft drove them down from the boot top,
@@ -275,8 +280,6 @@ BASE_TOP_MARGIN = 2.0  # rotated board's lowest point vs base top — the ONLY
 #                        height constraint: clear the base, sit as low as
 #                        possible (the old 43 mm bottom-line rule applied only
 #                        to a base-parallel, unrotated mounting)
-RIB_TARGET = 5  # ribs wanted (auto-placed; may be fewer if posts crowd the plate)
-
 EPS = 0.01
 MIN = Align.MIN
 
@@ -380,13 +383,14 @@ def parse_pcb(
 # ---------------------------------------------------------------------------
 
 
-def joint_keys():
-    """Two shear keys standing on the seat plane. They locate the upright in
-    X/Y/yaw and carry the horizontal typing loads; the seat plane carries
-    compression, the screws carry lift and clamp."""
+def joint_keys(band_mid: float):
+    """Two shear keys standing on the seat plane, centered on the asymmetric
+    bottom band (band_mid ± key_x) so they always sit mid-boot. They locate
+    the upright in X/Y/yaw and carry the horizontal typing loads; the seat
+    plane carries compression, the screws carry lift and clamp."""
     keys = None
     for sx in (-1, 1):
-        key = Pos(sx * key_x - key_l / 2, key_y0, base_t) * Box(
+        key = Pos(band_mid + sx * key_x - key_l / 2, key_y0, base_t) * Box(
             key_l, key_w, key_h, align=(MIN, MIN, MIN)
         )
         keys = key if keys is None else keys + key
@@ -394,12 +398,12 @@ def joint_keys():
     return chamfer(keys.edges().group_by(Axis.Z)[-1], key_chamfer)
 
 
-def joint_screw_bores():
+def joint_screw_bores(xs: list[float]):
     """Vertical M4 clearance holes through the base (pair with
     joint_screw_head_pockets on the underside)."""
     bores = None
-    for sx in (-1, 1):
-        bore = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
+    for x in xs:
+        bore = Pos(x, joint_screw_y, -EPS) * Cylinder(
             joint_screw_d / 2,
             base_t + 2 * EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -408,7 +412,7 @@ def joint_screw_bores():
     return bores
 
 
-def joint_screw_head_pockets():
+def joint_screw_head_pockets(xs: list[float]):
     """Socket-head pockets open at the base underside: the heads must sit
     below the desk face or the base would rock on them, and the driver
     works from the open bottom anyway.
@@ -420,8 +424,8 @@ def joint_screw_head_pockets():
     unprinted tweaks. Minor stringing inside the pocket is a slicer
     matter — see the README print tips."""
     pockets = None
-    for sx in (-1, 1):
-        pocket = Pos(sx * joint_screw_x, joint_screw_y, -EPS) * Cylinder(
+    for x in xs:
+        pocket = Pos(x, joint_screw_y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -430,7 +434,7 @@ def joint_screw_head_pockets():
     return pockets
 
 
-def joint_nut_pockets():
+def joint_nut_pockets(xs: list[float]):
     """Boot-side nut seats, one negative per screw: clearance from the boot
     bottom up to the nut floor, a hex pocket with nut_h (0.2 mm) of
     headroom, and a pinched mouth at the boot top so the nut snaps in and
@@ -439,8 +443,8 @@ def joint_nut_pockets():
     mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
     floor = boot_nut_clear  # above the boot bottom
     pockets = None
-    for sx in (-1, 1):
-        pocket = Pos(sx * joint_screw_x, joint_screw_y, base_t - EPS) * (
+    for x in xs:
+        pocket = Pos(x, joint_screw_y, base_t - EPS) * (
             Cylinder(
                 joint_screw_d / 2,
                 floor + 2 * EPS,
@@ -458,7 +462,7 @@ def joint_nut_pockets():
     return pockets
 
 
-def joint_grooves():
+def joint_grooves(band_mid: float):
     """Key pockets in the boot underside, cut all the way through. The
     joint_clear margin over the keys keeps the boot seated on the base top
     plane, not on the keys; within key height the pocket walls are the shear
@@ -468,7 +472,7 @@ def joint_grooves():
     grooves = None
     for sx in (-1, 1):
         groove = Pos(
-            sx * key_x - key_l / 2 - joint_clear,
+            band_mid + sx * key_x - key_l / 2 - joint_clear,
             key_y0 - joint_clear,
             base_t - EPS,
         ) * Box(
@@ -481,30 +485,32 @@ def joint_grooves():
     return grooves
 
 
-def _coupon_box(z0: float, height: float):
+def _coupon_box(stand: Stand, z0: float, height: float):
     """Common footprint for the two joint-coupon fragments: wide enough to
-    hold a key and a screw position at their production spacing."""
+    hold a key and both screw positions at their production spacing."""
     frag_y0, frag_y1 = key_y0 - 18, key_y1 + 6
-    return Pos(0, (frag_y0 + frag_y1) / 2, z0 + height / 2) * Box(
-        2 * (joint_screw_x + 12), frag_y1 - frag_y0, height
+    half_w = (stand.joint_screw_xs[1] - stand.joint_screw_xs[0]) / 2 + 12
+    return Pos(stand.band_mid, (frag_y0 + frag_y1) / 2, z0 + height / 2) * Box(
+        2 * half_w, frag_y1 - frag_y0, height
     )
 
 
-def joint_coupon_base():
+def joint_coupon_base(stand: Stand):
     """Fit-test coupon, base side: key + screw bore + head pocket, printed
-    flat. Checks the 0.4 mm key clearance and the head-pocket depth."""
-    c = _coupon_box(0, base_t)
-    c += joint_keys()
-    c -= joint_screw_bores() + joint_screw_head_pockets()
+    flat. Checks the 0.2 mm key clearance and the head-pocket depth."""
+    c = _coupon_box(stand, 0, base_t)
+    c += joint_keys(stand.band_mid)
+    c -= joint_screw_bores(stand.joint_screw_xs)
+    c -= joint_screw_head_pockets(stand.joint_screw_xs)
     return c
 
 
-def joint_coupon_boot():
+def joint_coupon_boot(stand: Stand):
     """Fit-test coupon, boot side: groove + nut seat (floor, hex pocket,
     pinched mouth), printed flat on what would be the seat plane. Checks
     the groove fit and whether the nut snaps past the lip and stays."""
-    c = _coupon_box(base_t, boot_h)
-    c -= joint_grooves() + joint_nut_pockets()
+    c = _coupon_box(stand, base_t, boot_h)
+    c -= joint_grooves(stand.band_mid) + joint_nut_pockets(stand.joint_screw_xs)
     return Pos(0, 0, -base_t) * c  # onto the bed
 
 
@@ -641,20 +647,21 @@ class Stand:
             self.band_edges[sx] = sx * edge
         self.band_lo = self.band_edges[-1]
         self.band_hi = self.band_edges[1]
-        # the boot must host the joint nut seats — and the boot IS the band
-        # footprint, so this guard is about the band (hence the base slab)
-        need = joint_screw_x + nut_pocket_ac / 2 + 1  # pocket edge + 1 mm wall
-        if self.band_lo > -need or self.band_hi < need:
-            sys.exit(
-                f'error: joint screws at |x|={joint_screw_x:g} need the bottom '
-                f'band to cover ±{need:g}, got [{self.band_lo:g}, '
-                f'{self.band_hi:g}] — reduce the --set-angles spread'
-            )
         # the base slab IS the band footprint (bx = band width, slab centered
         # on the band's mid-x): base, boot and band share the same edges
         self.bx = self.band_hi - self.band_lo
+        self.band_mid = (self.band_lo + self.band_hi) / 2
+        # Joint screws hug the band's outer edges: the widest possible lever
+        # against pull-out, with the keys centered on the boot in between.
+        # Derived from the band, so they track any future band move.
+        edge_need = nut_pocket_ac / 2 + 1.5  # pocket + 1.5 mm outer wall
+        assert self.bx > 2 * edge_need, (
+            f'bottom band {self.bx:g} mm wide cannot hold two edge screws '
+            f'(need > {2 * edge_need:g} mm) — reduce the --set-angles spread'
+        )
+        self.joint_screw_xs = [self.band_lo + edge_need, self.band_hi - edge_need]
         self.rib_x = self._auto_ribs()
-        if len(self.rib_x) < 3:
+        if len(self.rib_x) < 2:
             print(f'warning: only {len(self.rib_x)} ribs fit inside the bottom band')
         # a post whose keep-box pokes past ITS side's band edge keeps a local
         # bulge tab instead of widening the whole part
@@ -807,43 +814,52 @@ class Stand:
     # -- rib / haunch auto-placement ------------------------------------------
 
     def _auto_ribs(self) -> list[float]:
-        """Rib x positions: farthest-point sampling over the candidates that
-        fit INSIDE the bottom band (|x| <= band edge - (rib_t/2 + 1) per
-        side), keep >= 12 mm sideways to every post passing through the rib
-        band and clear of the joint hardware crossing the boot bottom (keys
-        at |x| <= key_x + key_l/2, screw counterbores around joint_screw_x).
-        A side with no valid candidate gets no rib: fewer than RIB_TARGET is
-        the normal fallback on a crowded layout, never a widened band."""
-        y_lo, y_hi = 3 - 6, rib_h + 6  # rib band incl. post radius
-        zone = [(x, y) for x, y in self.all_posts if y_lo <= y <= y_hi]
-        lo = self.band_lo + rib_t / 2 + 1
-        hi = self.band_hi - rib_t / 2 - 1
-        cand = []
-        for i in range(int((hi - lo) / 2) + 1):
-            x = lo + 2 * i
-            if abs(x) < key_x + key_l / 2 + rib_t / 2 + 1:
-                continue
-            if abs(abs(x) - joint_screw_x) < nut_pocket_ac / 2 + rib_t / 2 + 1:
-                continue
-            if all(abs(x - px) >= 12 for px, _ in zone):
-                cand.append(x)
-        if not cand:
-            return []
-        chosen = [max(cand)]  # start at the left edge of the free strip
-        while len(chosen) < RIB_TARGET:
-            nxt = max(cand, key=lambda x: min(abs(x - c) for c in chosen))
-            if min(abs(nxt - c) for c in chosen) < 15:
-                break
-            chosen.append(nxt)
-        # ribs must never poke outside the band — the fit rule above
-        # guarantees it; the assert keeps future keep-out edits honest
-        for rx in chosen:
+        """Rib x positions: one rib per joint screw, just INBOARD of it —
+        the edge screw is the pull-out/clamp anchor, so its rib backs the
+        highest junction load, and outboard of the screw nothing is left
+        inside the band anyway. Hard limits: every post crossing the rib
+        band keeps >= 12 mm sideways (a back-face screw bore or nut pocket
+        must never be buried — same figure as the haunch cap), the merged
+        key-bar grooves keep >= 1 mm, and the rib stays fully inside the
+        band with >= 1 mm margin. A rib with no valid slot is dropped and
+        reported: fewer ribs is the normal fallback on a crowded layout,
+        never a widened band."""
+        post_keep = 12.0  # back-face hardware clearance, cf. _cap_haunch
+        zone = [x for x, y in self.all_posts if -3 <= y <= rib_h + 6]
+        key_lo = self.band_mid - key_x - key_l / 2 - joint_clear
+        key_hi = self.band_mid + key_x + key_l / 2 + joint_clear
+        lo = self.band_lo + 1 + rib_t / 2
+        hi = self.band_hi - 1 - rib_t / 2
+        ribs: list[float] = []
+        for x_s in self.joint_screw_xs:
+            # the key bar splits the band, so this screw's rib must stay on
+            # the screw's side of it; start right inboard of the nut pocket
+            inb = 1.0 if x_s < self.band_mid else -1.0
+            if inb > 0:  # left screw: between band edge and key bar
+                s_lo, s_hi = lo, key_lo - 1 - rib_t / 2
+            else:  # right screw: between key bar and band edge
+                s_lo, s_hi = key_hi + 1 + rib_t / 2, hi
+            rib_off = nut_pocket_ac / 2 + rib_t / 2 + 1  # clear the pocket
+            x = 2 * round((x_s + inb * rib_off) / 2)  # even mm
+            x = min(max(x, s_lo), s_hi)
+            while s_lo <= x <= s_hi and any(abs(x - px) < post_keep for px in zone):
+                x += 2.0 * inb  # post hardware in the way: slide inboard
+            if s_lo <= x <= s_hi:
+                ribs.append(x)
+            else:
+                print(
+                    f'note: no rib fits inboard of the joint screw at '
+                    f'x={x_s:g} (pocket-post hardware vs key bar) — dropped'
+                )
+        # ribs must never poke outside the band — the fit rules above
+        # guarantee it; the assert keeps future keep-out edits honest
+        for rx in ribs:
             assert (
                 rx - rib_t / 2 >= self.band_lo + 1
                 and rx + rib_t / 2 <= self.band_hi - 1
             ), (f'rib x={rx:g} pokes outside the band '
                 f'[{self.band_lo:g}, {self.band_hi:g}]')
-        return sorted(chosen)
+        return sorted(set(ribs))
 
     def _cap_haunch(self) -> float:
         """Cap the haunch height so its ridge never runs behind a mounted
@@ -1110,8 +1126,9 @@ class Stand:
                 ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
             )
             base -= pocket
-        base += joint_keys()
-        base -= joint_screw_bores() + joint_screw_head_pockets()
+        base += joint_keys(self.band_mid)
+        base -= joint_screw_bores(self.joint_screw_xs)
+        base -= joint_screw_head_pockets(self.joint_screw_xs)
         return base
 
     # -- upright: backplate + posts + boot foot, one part per tilt angle ------
@@ -1148,8 +1165,8 @@ class Stand:
         # boot + haunch + ribs span the bottom-band footprint exactly: boot,
         # base slab and band share the same edges, so the old full-width boot
         # (which stuck out ~14 mm past the band on its narrow side) is gone.
-        # Outboard wall at the joint nut seats: 10.7 mm left / 24.7 mm right
-        # at the default layout — the left one is the tight reference now.
+        # Outboard wall at the joint nut seats is a uniform 1.5 mm — the
+        # screws hug the band edges by construction (see __init__).
         boot_w = self.band_hi - self.band_lo
         boot = Pos(
             (self.band_lo + self.band_hi) / 2,
@@ -1191,8 +1208,8 @@ class Stand:
         body += boot
         if self.flange_w > 0:
             body += self._breakaway_flange()
-        body -= joint_grooves()
-        body -= joint_nut_pockets()
+        body -= joint_grooves(self.band_mid)
+        body -= joint_nut_pockets(self.joint_screw_xs)
         # Re-cut the lowest post's self-tap pilot: the boot union would
         # otherwise fill it — the boot box covers the plate's lower back
         # region (world z up to 14, the pilot sits at ~12.9 at t30/-35).
@@ -1385,8 +1402,12 @@ def main() -> None:
             print(f'          {step}')
 
     if args.part == 'joint':
-        emit(joint_coupon_base(), 'joint_coupon_base')
-        emit(joint_coupon_boot(), 'joint_coupon_boot')
+        # the coupons reuse the exact production features, so they need the
+        # derived layout (band mid / screw positions) from a real Stand
+        stand = Stand(pcb_w, pcb_h, holes, outline, args.post_h, args.attach,
+                      set_angles)
+        emit(joint_coupon_base(stand), 'joint_coupon_base')
+        emit(joint_coupon_boot(stand), 'joint_coupon_boot')
         return
 
     # The base is tilt- and side-independent: one Stand, one export.
@@ -1433,10 +1454,12 @@ def main() -> None:
                 f'{max(x for x, _ in pts):7.2f}]  '
                 f'lowest PCB outline point z={corner_z:6.2f} mm'
             )
+        key_xs = [round(stand.band_mid + s * key_x, 1) for s in (-1, 1)]
         print(
             f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
             f'  | haunch_h = {stand.haunch_h:.1f} mm'
-            f'  | joint: keys x=±{key_x:g}, screws x=±{joint_screw_x:g} '
+            f'  | joint: keys x = {key_xs}, '
+            f'screws x = {[round(x, 1) for x in stand.joint_screw_xs]} '
             f'({joint_screw} from below)'
         )
         print(
