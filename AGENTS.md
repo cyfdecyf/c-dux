@@ -90,7 +90,7 @@ cd case/build123d && ruff check stand.py    # 配置在 ruff.toml（行宽 90、
 
 ## 约定
 
-- 提交信息用英文，带区域前缀，如 `case/build123d: ...`、`image: ...`
+- 提交信息用中文，带区域前缀，如 `case/build123d: ...`、`image: ...`
 - 注释/文档语言跟随各文件现状：`stand.py` 用英文，`case/build123d/README.md` 用中文，根 `README.md` 用英文
 - 根 README 的「Tips for using Ergogen with KiCAD」记录了非按键封装的定位工作流
   - Ergogen 任意位置生成 → KiCad 鼠标摆放 → 标尺量相对位置 → 回填 yaml
