@@ -149,18 +149,21 @@ plate_r = 8
 post_d = 10  # solid standoff boss; the Ø4.5 screw bore leaves a 2.75 mm wall
 post_edge_margin = 5  # plate edge beyond a post center: keep = post_d/2 +
 #                      post_edge_margin = 10 still clears the Ø8.6 nut
-#                      pocket + lip on the back face; also the keep-out used
-#                      by the taper outline (_taper_outline) and the
+#                      pocket keep-out on the back face; also the keep-out
+#                      used by the taper outline (_taper_outline) and the
 #                      per-side bottom-band derivation (__init__)
 taper_margin = 2  # the full-width band extends this far above the rib tops
 #                  before the outline tapers in to the post columns
-nut_af = 7.4
+nut_af = 7.2  # hex pocket across flats, NO pinch lip anywhere (user call,
+#              replacing 7.4 AF + 6.9 lip): the 7.0 nut drops in freely and
+#              sits ~0.1 mm/side centred — the lip's 0.2 mm/side float made
+#              screw start fiddly. Retention is friction only until the
+#              screw clamps the nut, so nuts are inserted at assembly time
 nut_h = 3.4
-nut_mouth_h = 1.2  # PCB nut pocket: pinch-lip depth at the plate back face
-nut_pocket_depth = 4.6  # PCB nut pocket depth into the plate: lip + nut_h;
-#                         leaves plate_t - 4.6 = 1.4 mm of front wall that
-#                         the Ø10 post directly buttresses — the nut bears
-#                         on that wall (clamp load: nut -> wall -> post)
+nut_pocket_depth = nut_h  # PCB nut pocket depth into the plate; leaves
+#                          plate_t - depth = 2.6 mm of front wall that the
+#                          Ø10 post directly buttresses — the nut bears on
+#                          that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
 tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
 #             straight in; user-sized up from the 3.4 first draft)
@@ -287,13 +290,9 @@ head_pocket_h = 4.2
 boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
 #                      this pocket floor takes the clamp load — keep it
 #                      chunky, plastic creeps under a sustained bolt load
-nut_mouth_af = 6.9  # nut-pocket mouth, a hex pinch below the nut's 7.0
-#                    across flats: push the nut in past the flexing lip
-#                    and it stays with the upright. The pinch MUST be a
-#                    hex aligned with the pocket: a square mouth needs a
-#                    ~7.25 side to pass a 7.0 hex nut in-plane, so a
-#                    square opening this size just blocks the nut.
-nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
+nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
+#                     generous vs the 8.31 actual at 7.2 AF on purpose —
+#                     keep-outs outlive pocket dimension tweaks
 
 # --- rotation set ---------------------------------------------------------------
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
@@ -470,11 +469,12 @@ def joint_screw_head_pockets(xs: list[float]):
 
 def joint_nut_pockets(xs: list[float]):
     """Boot-side nut seats, one negative per screw: clearance from the boot
-    bottom up to the nut floor, a hex pocket with nut_h (0.2 mm) of
-    headroom, and a pinched mouth at the boot top so the nut snaps in and
-    stays with the upright — each angle's upright can keep its own pair."""
+    bottom up to the nut floor, then one open-topped hex pocket straight
+    through to the boot ledge — no pinch lip (deleted, see nut_af): the
+    nut drops in from the top and seats on the bearing floor. Until the
+    screw clamps it the nut is friction-held only, so drive the joint
+    screws with the stand lying on its back."""
     hex_r = (nut_af / 2) / math.cos(math.radians(30))
-    mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
     floor = boot_nut_clear  # above the boot bottom
     pockets = None
     for x in xs:
@@ -485,11 +485,9 @@ def joint_nut_pockets(xs: list[float]):
                 align=(Align.CENTER, Align.CENTER, MIN),
             )
             + Pos(0, 0, floor)
-            * extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h)
-            + Pos(0, 0, floor + nut_h)
             * extrude(
-                RegularPolygon(mouth_r, 6, major_radius=True),
-                boot_h - floor - nut_h + EPS,
+                RegularPolygon(hex_r, 6, major_radius=True),
+                boot_h - floor + EPS,
             )
         )
         pockets = pocket if pockets is None else pockets + pocket
@@ -540,9 +538,9 @@ def joint_coupon_base(stand: Stand):
 
 
 def joint_coupon_boot(stand: Stand):
-    """Fit-test coupon, boot side: groove + nut seat (floor, hex pocket,
-    pinched mouth), printed flat on what would be the seat plane. Checks
-    the groove fit and whether the nut snaps past the lip and stays."""
+    """Fit-test coupon, boot side: groove + nut seat (floor, open hex
+    pocket), printed flat on what would be the seat plane. Checks the
+    groove fit and that the 7.0 nut drops in and starts cleanly."""
     c = _coupon_box(stand, base_t, boot_h)
     c -= joint_grooves(stand.band_mid) + joint_nut_pockets(stand.joint_screw_xs)
     return Pos(0, 0, -base_t) * c  # onto the bed
@@ -999,7 +997,7 @@ class Stand:
     def _cap_haunch(self) -> float:
         """Cap the haunch height so its ridge never runs behind a mounted
         post's back-face hardware: the screw clearance bore and, wider still, the
-        nut pocket mouth (hex ~4.3 mm major radius plus wall, hence 6.5 mm
+        nut pocket opening (hex ~4.2 mm major radius plus wall, hence 6.5 mm
         clear of the post center). Floored at 2 mm: below that the wedge is
         a negligible sliver — it only softens the junction corner, the ribs
         carry the load — so once the pattern drops (keyboard_drop) the cap
@@ -1220,8 +1218,8 @@ class Stand:
             # GUARD: the cuts intentionally pass closer to the posts than
             # the taper's 10 mm keep, but a back-face nut pocket must never
             # be clipped: every post center keeps >= 6.5 mm to both lines
-            # (pocket across-corner radius 4.27 + pinch lip + wall margin,
-            # the figure the haunch cap uses). The top/side posts sit at
+            # (pocket across-corner radius 4.16 + wall margin, the figure
+            # the haunch cap uses). The top/side posts sit at
             # exactly e = 7.0 mm on their own side's line — that is the
             # design, not a violation. A layout change that violates this
             # must fail loudly, not silently shave a pocket.
@@ -1241,7 +1239,7 @@ class Stand:
                     sys.exit(
                         f'error: top-corner cut {name} passes within '
                         f'{min(dists):.2f} mm of a post center (guard '
-                        f'{cut_guard} mm = nut pocket 4.27 + lip + margin); '
+                        f'{cut_guard} mm = nut pocket 4.16 + margin); '
                         f'distances: {listing}'
                     )
             # through-thickness polygon extrusions, same EPS style as the
@@ -1334,26 +1332,19 @@ class Stand:
                 # Clamp from the back: the post top stays SOLID and bears the
                 # PCB; the M4 nut lives in a hex pocket opened at the plate's
                 # BACK face, radially inside the post footprint. The screw
-                # (M4x12: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm + 3.4 nut)
+                # (M4x12: grip PCB 1.6 + post 3 + wall 2.6 ≈ 7.2 mm + 3.2 nut)
                 # comes through the board and pulls the nut against the
-                # 1.4 mm front wall the post directly buttresses — load path
+                # 2.6 mm front wall the post directly buttresses — load path
                 # nut -> wall -> post, pure compression, no printed bridge.
-                # The mouth is a hex pinch (nut_mouth_af < nut across flats,
-                # aligned with the pocket hex) so the nut snaps in from the
-                # back and stays with the upright. The screw passes through
-                # the pocket volume; both are cuts, so that is fine.
+                # No pinch lip (deleted, see nut_af): the 7.2 AF pocket is a
+                # light slide fit, so nuts are inserted plate-back-up at PCB
+                # assembly and stay by friction until the screw clamps them.
+                # The screw passes through the pocket volume; both are cuts,
+                # so that is fine.
                 hex_r = (nut_af / 2) / math.cos(math.radians(30))
-                mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
-                solid -= Pos(x, y, -EPS) * (
-                    extrude(
-                        RegularPolygon(mouth_r, 6, major_radius=True),
-                        nut_mouth_h + EPS,
-                    )
-                    + Pos(0, 0, nut_mouth_h)
-                    * extrude(
-                        RegularPolygon(hex_r, 6, major_radius=True),
-                        nut_pocket_depth - nut_mouth_h,
-                    )
+                solid -= Pos(x, y, -EPS) * extrude(
+                    RegularPolygon(hex_r, 6, major_radius=True),
+                    nut_pocket_depth + EPS,
                 )
                 # screw clearance: back face through plate + post, out the top
                 solid -= Pos(x, y, -EPS) * Cylinder(
@@ -1468,19 +1459,19 @@ class Stand:
                 Plane.YZ * self._wedge(rib_t + 8, rh, rad), rib_t
             )
         # keyboard_drop can park the lowest POCKET post's back-face nut
-        # pocket inside the boot's z-band (t30/-35 drop 20: mouth spans
-        # world z 8.4..15.3 vs boot top 14), burying its pinch mouth. Cut
-        # an access window through the boot in front of that pocket: the
-        # nut slides in with tweezers, and the pinch lip — which lives in
-        # the plate — still retains it. Boot-only cut, applied before the
-        # union, so the plate's pocket and nut seat stay intact. With
-        # lowest_post_tapped = True the lowest post has a plain self-tap
-        # pilot (no pocket, no access needed), so this auto-skips whenever
-        # the lowest POCKET clears the boot top on its own (drop 30 /
-        # t30/-35: lowest pocket mouth z ~ 47 mm).
+        # pocket inside the boot's z-band (t30/-35 drop 20: opening spans
+        # world z 8.4..15.3 vs boot top 14), leaving the pocket unreachable
+        # from behind. Cut an access window through the boot in front of
+        # that pocket: the nut slides in with tweezers. Boot-only cut,
+        # applied before the union, so the plate's pocket stays intact.
+        # With lowest_post_tapped = True the lowest post has a plain
+        # self-tap pilot (no pocket, no access needed), so this auto-skips
+        # whenever the lowest POCKET clears the boot top on its own (drop
+        # 30 / t30/-35: lowest pocket opening z ~ 47 mm).
         lo_x, lo_y = min(self.pocket_posts, key=lambda p: p[1])
-        if (lo_y - 3.98) * self.ct < boot_h + 0.5:
-            # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
+        pocket_ac_r = (nut_af / 2) / math.cos(math.radians(30))
+        if (lo_y - pocket_ac_r) * self.ct < boot_h + 0.5:
+            # rear edge = opening rear (lo_y*st + 4*st) plus nut body + margin
             win_y1 = (lo_y + 4.0) * self.st + 2.0
             boot -= Pos(lo_x - 5.5, self.boot_front, base_t - EPS) * Box(
                 11.0, win_y1 - self.boot_front, boot_h + 2 * EPS,
