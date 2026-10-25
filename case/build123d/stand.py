@@ -13,12 +13,13 @@ Highlights over the retired OpenSCAD version:
     table and refuses to run if anything moved.
   * B-rep fillets: the base slab gets a rounded top perimeter, which CSG
     mesh tools cannot do.
-  * Demountable two-part design: the base slab is printed ONCE (it is
-    symmetric and shared by both sides and every tilt angle); the upright
-    (backplate + posts + boot foot) is printed per tilt angle. The joint is
-    two shear keys plus 2x M4x12 screws driven up from the open base
-    underside into nuts seated in the boot — swapping angles means
-    reprinting only the upright.
+  * Demountable two-part design: the base slab tracks the bottom-band
+    footprint (derived from the post layout) and the boot matches it
+    edge-for-edge, so nothing protrudes sideways past the plate band. The
+    upright (backplate + posts + boot foot) is printed per tilt angle; the
+    slab only needs a reprint when a layout change moves the band or the
+    ±joint_screw_x bores. The joint is two shear keys plus 2x M4x12 screws
+    driven up from the open base underside into nuts seated in the boot.
   * Junction reinforcement survives the split: the wide haunch and the
     back-face ribs moved onto the upright's boot.
   * PCB clamped by 3 screws: solid Ø10 post tops bear the board (all 4 of
@@ -160,11 +161,6 @@ base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 base_front = 30  # apron towards the user, trimmed for cost: typing loads
 #                 lean on the rear lever arm, the front pads carry little
 base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
-base_side = 10  # lateral margin past the PCB: the base is 132.5 mm wide and
-#                ALREADY PRINTED at that width — it stays the width reference;
-#                the upright sits upright_inset (2 mm) inside it per side.
-#                The old 16 predates a PCB/plate change and left 6 mm of dead
-#                slab per side — lateral stance rides on the pad spread
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -203,13 +199,11 @@ pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
 #              so every mm outward is a mm of tip lever (was 4: keep-out, not
 #              stability; 2 mm still leaves the 0.6 mm recess fully on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
-upright_inset = 2  # upright/boot setback per side from the base edge: the
-#                    base's 2 mm top-perimeter fillet means a truly flush
-#                    side would overhang the rounded edge — sit 2 mm inboard
 
 # --- base ↔ upright joint -------------------------------------------------------
-# The stand ships as two printed parts: the base slab (printed once — shared
-# by every tilt angle and both sides) and a per-angle upright (backplate +
+# The stand ships as two printed parts: the base slab (shared by every tilt
+# angle while the post layout — and with it the band footprint and the screw
+# bores — stays put) and a per-angle upright (backplate +
 # posts + boot foot). Every joint feature is laid out in WORLD coordinates on
 # the horizontal seat plane z = base_t, so one base accepts uprights of any
 # tilt. Assembly per side: drop the upright onto the two keys, then drive
@@ -249,8 +243,12 @@ flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
 joint_screw_d = 4.5  # M4 clearance through boot + base — the printed and
 #                     assembled reference; 31bef39's +0.2 oversize never
 #                     printed and was reverted with the rest of it
-joint_screw_x = 58  # on the boot ledge for every tilt in 10..40 deg; must
-#                    clear the keys and the ribs (see the rib keep-outs)
+joint_screw_x = 35  # inboard on the narrowed boot: the boot now matches the
+#                    bottom-band footprint, and ±58 would need boot material
+#                    past the band edge. |x| 30.7 (nut pocket wall) still
+#                    clears the key grooves at ±27.4 by 3.3 mm, and the ribs'
+#                    own keep-out (±46.3) stays clear of the in-band posts.
+#                    The base reprint moves its bores/head pockets to match.
 joint_screw_y = 14.5
 # Screw direction: the nuts live in the BOOT, the screws come up from the
 # open base underside. The first draft drove them down from the boot top,
@@ -283,7 +281,11 @@ SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
-PLATE_HALF_BOUND = 72.0  # max post |x| so the plate stays on the base
+PLATE_HALF_BOUND = 72.0  # lateral layout sanity cap: the solver keeps post
+#                          |x| <= this - 8, and the bottom band (hence the
+#                          base slab — the band IS the slab now) never
+#                          exceeds it either; a wider wish is a layout
+#                          problem, not a wider slab
 BASE_TOP_MARGIN = 2.0  # rotated board's lowest point vs base top — the ONLY
 #                        height constraint: clear the base, sit as low as
 #                        possible (the old 43 mm bottom-line rule applied only
@@ -602,7 +604,6 @@ class Stand:
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
-        self.bx = pcb_w + 2 * base_side
         self.y0 = -base_front
         self.y1 = base_rear
         self.ct, self.st = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
@@ -634,46 +635,41 @@ class Stand:
             pcb_w / 2 + plate_margin, max(abs(x) for x, _ in self.all_posts) + keep
         )
         self.plate_w = 2 * self.plate_half
-        # boot/haunch/rib width: trimmed to upright_inset inside the base per
-        # side (the base's top fillet rules out a truly flush side)
-        self.flush_w = min(self.plate_w, self.bx - 2 * upright_inset)
-        # the guard was really about the BOOT hosting the joint screws
-        if self.flush_w / 2 < joint_screw_x + 5:
-            sys.exit(
-                f'error: joint screws at |x|={joint_screw_x:g} need boot half-width '
-                f'>= {joint_screw_x + 5:g}, got {self.flush_w / 2:.1f} — reduce the '
-                '--set-angles spread'
-            )
-        self.rib_x = self._auto_ribs()
-        if len(self.rib_x) < 3:
-            print(f'warning: only {len(self.rib_x)} ribs fit around the post sets')
-        # per-side bottom-band edges (signed). The printed base slab (bx) is
-        # the width reference; the band sits upright_inset inside it per side.
-        # A side whose post keep-box pokes past that bound keeps the band at
-        # the bound and grows bulge tabs for the overhang; otherwise the band
-        # shrinks to what its outmost post (+2) and rib (+1) need, rounded up
-        # to even mm — no dead slab, and no rib sliver hanging beside the
-        # plate edge.
-        cap = self.bx / 2 - upright_inset
+        # per-side bottom-band edges (signed): POST needs only — the outmost
+        # post's keep-box + 2 mm, rounded up to even mm, capped by the plate
+        # blank. A side whose needs exceed the solver's lateral envelope (the
+        # reworded PLATE_HALF_BOUND sanity cap) keeps the band at the cap and
+        # carries the post on a local bulge tab. Ribs no longer widen the
+        # band: _auto_ribs only places them where they fit INSIDE it, and a
+        # rib that fits nowhere is simply skipped (fewer ribs is normal).
+        cap = PLATE_HALF_BOUND - 8
         self.band_edges: dict[int, float] = {}
         for sx in (-1, 1):
             post_need = max(
                 (abs(x) + keep for x, _ in self.all_posts if (x > 0) == (sx > 0)),
                 default=0.0,
             )
-            rib_need = max(
-                (abs(x) + rib_t / 2 + 1 for x in self.rib_x if (x > 0) == (sx > 0)),
-                default=0.0,
-            )
-            if post_need > cap:
-                edge = min(self.plate_half, max(cap, rib_need))
-            else:
-                edge = min(
-                    self.plate_half, math.ceil(max(post_need + 2, rib_need) / 2) * 2
-                )
+            edge = min(self.plate_half, math.ceil((post_need + 2) / 2) * 2)
+            if edge > cap:
+                edge = min(self.plate_half, cap)
             self.band_edges[sx] = sx * edge
         self.band_lo = self.band_edges[-1]
         self.band_hi = self.band_edges[1]
+        # the boot must host the joint nut seats — and the boot IS the band
+        # footprint, so this guard is about the band (hence the base slab)
+        need = joint_screw_x + nut_pocket_ac / 2 + 1  # pocket edge + 1 mm wall
+        if self.band_lo > -need or self.band_hi < need:
+            sys.exit(
+                f'error: joint screws at |x|={joint_screw_x:g} need the bottom '
+                f'band to cover ±{need:g}, got [{self.band_lo:g}, '
+                f'{self.band_hi:g}] — reduce the --set-angles spread'
+            )
+        # the base slab IS the band footprint (bx = band width, slab centered
+        # on the band's mid-x): base, boot and band share the same edges
+        self.bx = self.band_hi - self.band_lo
+        self.rib_x = self._auto_ribs()
+        if len(self.rib_x) < 3:
+            print(f'warning: only {len(self.rib_x)} ribs fit inside the bottom band')
         # a post whose keep-box pokes past ITS side's band edge keeps a local
         # bulge tab instead of widening the whole part
         self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
@@ -825,13 +821,17 @@ class Stand:
     # -- rib / haunch auto-placement ------------------------------------------
 
     def _auto_ribs(self) -> list[float]:
-        """Rib x positions: farthest-point sampling over the x candidates that
-        keep >= 12 mm sideways to every post passing through the rib band and
-        clear of the joint hardware crossing the boot bottom (keys at
-        |x| <= key_x + key_l/2, screw counterbores around joint_screw_x)."""
-        band_lo, band_hi = 3 - 6, rib_h + 6  # rib band incl. post radius
-        zone = [(x, y) for x, y in self.all_posts if band_lo <= y <= band_hi]
-        lo, hi = -(self.plate_half - 12), self.plate_half - 12
+        """Rib x positions: farthest-point sampling over the candidates that
+        fit INSIDE the bottom band (|x| <= band edge - (rib_t/2 + 1) per
+        side), keep >= 12 mm sideways to every post passing through the rib
+        band and clear of the joint hardware crossing the boot bottom (keys
+        at |x| <= key_x + key_l/2, screw counterbores around joint_screw_x).
+        A side with no valid candidate gets no rib: fewer than RIB_TARGET is
+        the normal fallback on a crowded layout, never a widened band."""
+        y_lo, y_hi = 3 - 6, rib_h + 6  # rib band incl. post radius
+        zone = [(x, y) for x, y in self.all_posts if y_lo <= y <= y_hi]
+        lo = self.band_lo + rib_t / 2 + 1
+        hi = self.band_hi - rib_t / 2 - 1
         cand = []
         for i in range(int((hi - lo) / 2) + 1):
             x = lo + 2 * i
@@ -849,6 +849,14 @@ class Stand:
             if min(abs(nxt - c) for c in chosen) < 15:
                 break
             chosen.append(nxt)
+        # ribs must never poke outside the band — the fit rule above
+        # guarantees it; the assert keeps future keep-out edits honest
+        for rx in chosen:
+            assert (
+                rx - rib_t / 2 >= self.band_lo + 1
+                and rx + rib_t / 2 <= self.band_hi - 1
+            ), (f'rib x={rx:g} pokes outside the band '
+                f'[{self.band_lo:g}, {self.band_hi:g}]')
         return sorted(chosen)
 
     def _cap_haunch(self) -> float:
@@ -869,10 +877,13 @@ class Stand:
     # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
-        px = self.bx / 2 - base_r - pad_edge
+        # per-side x: the slab IS the (asymmetric) band footprint, so each
+        # side's pad row hugs ITS band edge
+        px_lo = self.band_lo + base_r + pad_edge
+        px_hi = self.band_hi - base_r - pad_edge
         fy = self.y0 + base_r + pad_edge
         ry = self.y1 - base_r - pad_edge
-        return [(-px, fy), (px, fy), (0, fy), (-px, ry), (px, ry), (0, ry)]
+        return [(px_lo, fy), (px_hi, fy), (0, fy), (px_lo, ry), (px_hi, ry), (0, ry)]
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
@@ -1080,9 +1091,11 @@ class Stand:
     # -- base, world frame (desk = XY plane, user at -Y) ----------------------
 
     def base_solid(self):
-        base = Pos(0, (self.y0 + self.y1) / 2, base_t / 2) * Box(
-            self.bx, self.y1 - self.y0, base_t
-        )
+        # the slab matches the bottom-band footprint: same edges as the boot
+        # (asymmetric — the Box centers on the band's mid-x, not on 0)
+        base = Pos(
+            (self.band_lo + self.band_hi) / 2, (self.y0 + self.y1) / 2, base_t / 2
+        ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
         for px, py in self.pad_positions():
@@ -1160,20 +1173,21 @@ class Stand:
                     self.plate_w + 20,
                 )
             )
-        # boot + haunch + ribs span flush_w: the base width minus
-        # upright_inset per side (the base's 2 mm top fillet rules out a
-        # truly flush side), even where the plate keeps a post bulge further
-        # up. At the joint screws that leaves flush_w/2 - joint_screw_x -
-        # nut_pocket_ac/2 = 1.95 mm of boot wall outboard of each nut seat —
-        # tight, but a solid pocket wall.
-        flush_w = self.flush_w
-        boot = Pos(0, (boot_front + self.boot_rear) / 2, base_t + boot_h / 2) * Box(
-            flush_w, self.boot_rear - boot_front, boot_h
-        )
+        # boot + haunch + ribs span the bottom-band footprint exactly: boot,
+        # base slab and band share the same edges, so the old full-width boot
+        # (which stuck out ~14 mm past the band on its narrow side) is gone.
+        # Outboard wall at the joint nut seats: 10.7 mm left / 24.7 mm right
+        # at the default layout — the left one is the tight reference now.
+        boot_w = self.band_hi - self.band_lo
+        boot = Pos(
+            (self.band_lo + self.band_hi) / 2,
+            (boot_front + self.boot_rear) / 2,
+            base_t + boot_h / 2,
+        ) * Box(boot_w, self.boot_rear - boot_front, boot_h)
         # Full-width haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner corner.
-        boot += Pos(-flush_w / 2, boot_front, base_t) * extrude(
-            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), flush_w
+        boot += Pos(self.band_lo, boot_front, base_t) * extrude(
+            Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), boot_w
         )
         # Ribs continue up the back face into the hammering zone. Wedge
         # base depth rib_t + 8 (slimmed from +18 after the first print):
@@ -1203,7 +1217,7 @@ class Stand:
             )
         body += boot
         if self.flange_w > 0:
-            body += self._breakaway_flange(flush_w)
+            body += self._breakaway_flange()
         body -= joint_grooves()
         body -= joint_nut_pockets()
         # Trims the bottom post flares, which dip below the seat plane at
@@ -1223,20 +1237,24 @@ class Stand:
             align=None,
         )
 
-    def _breakaway_flange(self, flush_w: float):
+    def _breakaway_flange(self):
         """Thin ring around the boot footprint (--flange): bed-adhesion
         insurance for slick plates. flange_t tall so it snaps off with
         pliers after printing; added after the lip chamfer cut, so the two
-        never interact, and clear of every joint feature."""
+        never interact, and clear of every joint feature. Follows the boot
+        (band) footprint, so it centers on the band's mid-x too."""
+        boot_w = self.band_hi - self.band_lo
         outer = RectangleRounded(
-            flush_w + 2 * self.flange_w,
+            boot_w + 2 * self.flange_w,
             self.boot_rear - boot_front + 2 * self.flange_w,
             4,
         )
-        inner = Rectangle(flush_w, self.boot_rear - boot_front)
-        return Pos(0, (boot_front + self.boot_rear) / 2, base_t) * extrude(
-            outer - inner, flange_t
-        )
+        inner = Rectangle(boot_w, self.boot_rear - boot_front)
+        return Pos(
+            (self.band_lo + self.band_hi) / 2,
+            (boot_front + self.boot_rear) / 2,
+            base_t,
+        ) * extrude(outer - inner, flange_t)
 
     # -- top level ------------------------------------------------------------
 
@@ -1298,7 +1316,8 @@ def main() -> None:
         '--part',
         choices=['base', 'upright', 'full', 'fit', 'joint'],
         default='full',
-        help="'base' = shared slab (print once) | 'upright' = per-tilt part | "
+        help="'base' = base slab (follows the band footprint) | "
+        "'upright' = per-tilt part | "
         "'full' = fused preview | 'fit' = flat validation plate | "
         "'joint' = fit-test coupons",
     )
