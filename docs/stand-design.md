@@ -69,9 +69,9 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 | 函数 | 职责 | 关键点 |
 |---|---|---|
 | `parse_pcb` | 读 PCB 文件 → 板框 + 4 孔位 + 板框采样点 | 只认 Ergogen 导出的 `gr_line/gr_arc` 直边端点(圆角弧中点不参与取框);采样点逐段 ~1 mm 插值、站立系返回,供高度约束用;孔位与 `HOLES_EXPECTED` 逐项断言,超差 `sys.exit` |
-| `joint_keys` | 两根榫键 | 30×8×3.2 @ band_mid±12(合并为 54 mm 键条), y 12..20;顶缘 45° 导入倒角 |
+| `joint_keys` | 两根榫键 | 30×8×8 @ band_mid±12(合并为 54 mm 键条), y 12..20;顶缘 45° 导入倒角,键顶与靴座顶齐平(贯通槽下求交为 0) |
 | `joint_screw_bores` | 底座 Ø4.5 通孔 | @(靴座缘内缩 5.8, 14.5),由靴座缘派生(靴座 = 底带每侧内缩 `boot_inset`) |
-| `joint_screw_head_pockets` | 沉头孔 | Ø8 圆柱 + 平面台肩(1.75 mm 环形桥接;已实印装配验证,仅孔内少量拉丝——切片问题,见 README 打印建议) |
+| `joint_screw_head_pockets` | 沉头孔 | Ø7.6 圆柱 + 平面台肩(1.55 mm 环形桥接;已实印装配验证,仅孔内少量拉丝——切片问题,见 README 打印建议;Ø8 → 7.6:对实测 7.1 螺头减半空圈) |
 | `joint_nut_pockets` | 靴座螺母座 | Ø4.5 让位孔 + 顶面直开的六角沉孔(对边 7.2,地板 3.6;收口唇已删——螺母直落放入,夹紧前仅摩擦保持) |
 | `joint_grooves` | 靴座底榫槽 | 键 + 0.2 mm 间隙,**贯穿切割**(盲槽顶曾是 8.8 mm 单边桥,改为贯穿) |
 | `_convex_hull` / `_ccw` | 二维凸包 / 环绕向 | 收腰轮廓与凸台多边形用 |
@@ -369,8 +369,9 @@ post_h(CLI)、flange_t、pad_*`。`keyboard_drop = 30` 特殊:
 `boot_inset = base_top_fillet = 2`(靴座比底座足迹每侧内缩 2 mm:坐在
 底座顶面平直区内、避开周边 2 mm 圆角;立板底带钳制到靴座足迹、与其
 齐平;对称内缩故 boot_mid == band_mid)、
-`MIN_POST_CENTER = 11`、`BASE_TOP_MARGIN = 2`、`key_h = 3.2 <
-boot_nut_clear = 3.6`(立板承压落在座面而非键顶)、`base_t = 6`、
+`MIN_POST_CENTER = 11`、`BASE_TOP_MARGIN = 2`、`key_h = 8`(键顶
+与靴座顶齐平;榫槽贯通,键永不把立板顶离座面,加高换取更长剪切
+导向)、`base_t = 6`、
 `base_front = 25` / `base_rear = 85`(进深 110;抗后倾按“下移前布局”
 定尺:100 是 keyboard_drop 之前手拍的,下移 30 后最坏接触高度
 h ~170 → ~144 mm,等价老足迹 +20% 裕度,收到 85 后最坏工况持平

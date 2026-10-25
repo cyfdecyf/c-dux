@@ -238,8 +238,10 @@ joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    verify the tighter fit before ordering full parts)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
-key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
-#             top plane, never bottoming out on the keys
+key_h = 8  # full boot-height key, top flush with the boot top ledge: longer
+#           shear guidance, less rocking; the grooves are cut-through windows,
+#           so the key can never bottom out and the boot still seats on the
+#           seat plane, never on the keys (verified: key/boot interference 0)
 key_x = 12  # key centerline offset from the BAND MID (band_mid ± key_x —
 #            the band is asymmetric, so mid-boot anchoring keeps the merged
 #            key bar centered); keys span y ∈ (key_y0, key_y1)
@@ -284,8 +286,11 @@ joint_screw_y = 14.5
 # leaves no room for a driver; from below the access is unobstructed, and
 # a longer screw costs nothing.
 joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
-head_pocket_d = 8.0  # socket-head pocket in the base underside: the heads
-#                     must sit below the desk face or the base would rock
+head_pocket_d = 7.6  # socket-head pocket in the base underside: the heads
+#                     must sit below the desk face or the base would rock.
+#                     8.0 printed a visible slop ring around the user's
+#                     7.1 mm head; 7.6 halves it while still absorbing FDM
+#                     shrink + bore eccentricity when tightening
 head_pocket_h = 4.2
 boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
 #                      this pocket floor takes the clamp load — keep it
