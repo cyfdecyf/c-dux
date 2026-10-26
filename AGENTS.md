@@ -68,6 +68,7 @@ uv run check_pcb_alignment.py                     # gerber 钻孔 ↔ KiCad 封�
 | `key_layout_check.py` | 给定 `--set-angles`/`--tilt`，不建实体快速列出安装后各键世界高度与最低键——选旋转方向、确认键位布局用 |
 | `keyboard_clearance_check.py` | 键盘（PCB 实体 + 轴体 + 键帽/热插拔座保守代理，尺寸可用参数调）对底座/立板/靴座做布尔干涉检查与间隙量化，输出最低板料点、角点朝向数据；`--json` 导出绘图数据 |
 | `pcb_rotation_figure.py` | PCB 旋转前后对比图：平放/安装的正视 + 侧视，每格画水平面，标键位、最高亮键与角点朝向；输入 = clearance 脚本的 JSON + `stand.py --part full` 的装配 STL |
+| `mounting_diagram.py` | 重新生成 README 的 mounting.png 安装朝向示意图：左 PCB 站立系平放（孔位/部件/朝向），右装上立板的板局部系（真实板框截面 + 柱位，H3 自攻标注） |
 | `check_pcb_alignment.py` | PCB 改版防呆：gerber PTH 钻孔 ↔ KiCad 封装坐标 ↔ `parse_pcb`/`HOLES_EXPECTED` ↔ 立板柱位四方核对（刚性映射、无镜像） |
 | `layer_float_audit.py` / `overhang_report.py` | 打印性审计：0.2 mm 逐层悬空/孤岛、下行面坡度分桶；依赖用 `uv run --with …` 临时装入（见上） |
 | `base_dims_diagram.py` | 由 stand.py 常量自动生成底座 front/rear/进深示意图（README 引用） |
