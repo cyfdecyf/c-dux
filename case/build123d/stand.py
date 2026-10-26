@@ -38,7 +38,7 @@ Highlights over the retired OpenSCAD version:
     posts carry the same flare. The haunch toe now wraps the pilot's
     rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default -40 deg in-plane rotation = home-row slope), and the backplate
+    default -45 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -53,7 +53,7 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default -40 deg CCW in the front view; negate to
+centroid by --set-angles (default -45 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest outline point (real Edge.Cuts material —
 the bbox corner holds no board) clears the base top by 2 mm, then shifts
@@ -133,10 +133,11 @@ bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  the base top, and keyboard_drop eats most of that margin
 keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 # much (user asked for "键盘下移 3cm"; the real-outline height floor auto-
-# caps the NET drop at ~29.1 mm — the solver lifts the pattern just enough
-# to hold the 2 mm base-top margin: printed lowest PCB outline point
-# z = 8.00, lift ~0.9. The old 20 cap guarded the lowest post's back-face
-# nut pocket vs the boot top; lowest_post_tapped = True removes it)
+# caps the NET drop wherever it binds — the solver lifts the pattern just
+# enough to hold the 2 mm base-top margin; angle-dependent: t30/-35 lift
+# ~0.9 -> net 29.1, lowest point z = 8.00, while t30/-45 leaves lift = 0
+# (net 30, lowest point z ~ 9.8). The old 20 cap guarded the lowest post's
+# back-face nut pocket vs the boot top; lowest_post_tapped = True removes it)
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
@@ -240,7 +241,7 @@ boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             current working default: 30 deg with SET_ANGLES [-40]
+#             current working default: 30 deg with SET_ANGLES [-45]
 joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    (halved from the old 0.4 baseline — less slop on the
 #                    merged key bar; print a --part joint coupon FIRST to
@@ -314,7 +315,7 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
 # shifts the whole pattern keyboard_drop down the plate.
-SET_ANGLES = [-40]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-45]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
