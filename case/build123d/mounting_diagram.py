@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Mounting-orientation diagram for the README (mounting.png).
+"""Mounting-orientation diagram for the README
+(images/mounting.png).
 
 Two panels, both true to the current single-post-group design:
   left — the PCB flat in the stand frame (no in-plane rotation): real
@@ -59,7 +60,7 @@ def parse_args() -> argparse.Namespace:
         default=','.join(str(a) for a in stand.SET_ANGLES),
         help='leading minus needs the = form: --set-angles=-45',
     )
-    ap.add_argument('--out', default='mounting.png')
+    ap.add_argument('--out', default='images/mounting.png')
     return ap.parse_args()
 
 
@@ -215,7 +216,8 @@ def main() -> None:
         ax_b.add_patch(plt.Circle((x, y), 7.5, facecolor='none',
                                   edgecolor=C_TAP if tapped else C_POST,
                                   lw=1.4, ls='--', zorder=6))
-        ax_b.add_patch(plt.Circle((x, y), 3.8 if tapped else 4.5,
+        ax_b.add_patch(plt.Circle((x, y),
+                                  stand.tap_d / 2 if tapped else 4.5,
                                   facecolor='white',
                                   edgecolor=C_TAP if tapped else C_POST,
                                   lw=1.6, zorder=6))
@@ -227,7 +229,7 @@ def main() -> None:
               '求解器横向居中并守住 PCB 最低点距底座顶 ≥2 mm，\n'
               f'整组再下移 {stand.keyboard_drop:g} mm；立板另后仰 '
               f'{s.tilt:g}°（此图未画）。\n'
-              '虚线 = Ø15 柱喇叭口，H3 为 Ø3.8 自攻底孔（免螺母）。',
+              f'虚线 = Ø15 柱喇叭口，H3 为 Ø{stand.tap_d:g} 自攻底孔（免螺母）。',
               transform=ax_b.transAxes, fontsize=9.5, va='bottom',
               bbox={'fc': 'white', 'ec': '0.7', 'alpha': 0.9})
     ax_b.set_aspect('equal')

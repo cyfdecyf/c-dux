@@ -297,8 +297,8 @@ def main() -> None:
     toe = (y_wall - st * hy) / ct
     seat = (ct * hy) / st                # axis crosses the seat plane z=6
     toe = min(toe, seat)
-    print(f'   free bore (PCB {args.pcb_t:g} + post {s.post_h:g} + plate '
-          f'{stand.plate_t:g})        = {free:.1f} mm')
+    print(f'   free bore Ø{stand.tap_d:g} (PCB {args.pcb_t:g} + post '
+          f'{s.post_h:g} + plate {stand.plate_t:g}) = {free:.1f} mm')
     print(f'   toe plastic behind back face (ends at '
           f"{'groove front wall' if in_groove_x else 'boot rear'} y={y_wall:g})"
           f' = {toe:.1f} mm')

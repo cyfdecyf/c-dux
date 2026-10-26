@@ -166,8 +166,9 @@ nut_pocket_depth = nut_h  # PCB nut pocket depth into the plate; leaves
 #                          Ø10 post directly buttresses — the nut bears on
 #                          that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
-tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
-#             straight in; user-sized up from the 3.4 first draft)
+tap_d = 4.0  # Ø self-tapping pilot for the lowest post (M4 screws
+#             straight in; user-sized up 3.4 -> 3.8 -> 4.0: PETG shrink
+#             plus vertical-print sag made 3.8 too tight to start)
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 #            for walls around the (since deleted) coin slots; 6 is plenty
 #            for a flat slab and drops the keyboard 2 mm
