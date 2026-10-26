@@ -33,12 +33,12 @@ Highlights over the retired OpenSCAD version:
     board; the lowest post is self-tapped instead (Ø tap_d pilot straight
     through post + plate — after the drop its back-face pocket would sit
     inside the boot's z-band with no insertion access, and a tapped hole
-    needs none). It also gets no Ø15 flare: at this drop the flare foot
-    would overhang the plate's bottom edge and be clipped into a lump —
-    a plain Ø10 wall prints fine. The haunch toe now wraps the pilot's
+    needs none). Its Ø15 flare dips past the plate's bottom edge and now
+    prints on the boot's coplanar front face (the buried lip), so all four
+    posts carry the same flare. The haunch toe now wraps the pilot's
     rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default -35 deg in-plane rotation = home-row slope), and the backplate
+    default -45 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -53,7 +53,7 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default -35 deg CCW in the front view; negate to
+centroid by --set-angles (default -45 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest outline point (real Edge.Cuts material —
 the bbox corner holds no board) clears the base top by 2 mm, then shifts
@@ -133,15 +133,16 @@ bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  the base top, and keyboard_drop eats most of that margin
 keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
 # much (user asked for "键盘下移 3cm"; the real-outline height floor auto-
-# caps the NET drop at ~29.1 mm — the solver lifts the pattern just enough
-# to hold the 2 mm base-top margin: printed lowest PCB outline point
-# z = 8.00, lift ~0.9. The old 20 cap guarded the lowest post's back-face
-# nut pocket vs the boot top; lowest_post_tapped = True removes it)
+# caps the NET drop wherever it binds — the solver lifts the pattern just
+# enough to hold the 2 mm base-top margin; angle-dependent: t30/-35 lift
+# ~0.9 -> net 29.1, lowest point z = 8.00, while t30/-45 leaves lift = 0
+# (net 30, lowest point z ~ 9.8). The old 20 cap guarded the lowest post's
+# back-face nut pocket vs the boot top; lowest_post_tapped = True removes it)
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
-# none. It also gets no Ø15 flare: at this drop the flare foot would
-# overhang the plate's bottom edge and be clipped into a lump
+# none. Its Ø15 flare dips past the plate edge but prints on the boot's
+# coplanar front face (flare_supported)
 top_rim = 5  # vertical (world-z) plate rim above the topmost post top: the
 #              backplate spans only the screw holes' desk projection (user
 #              sizing rule); PCB above the top posts cantilevers on them
@@ -149,26 +150,38 @@ plate_r = 8
 post_d = 10  # solid standoff boss; the Ø4.5 screw bore leaves a 2.75 mm wall
 post_edge_margin = 5  # plate edge beyond a post center: keep = post_d/2 +
 #                      post_edge_margin = 10 still clears the Ø8.6 nut
-#                      pocket + lip on the back face; also the keep-out used
-#                      by the taper outline (_taper_outline) and the
+#                      pocket keep-out on the back face; also the keep-out
+#                      used by the taper outline (_taper_outline) and the
 #                      per-side bottom-band derivation (__init__)
 taper_margin = 2  # the full-width band extends this far above the rib tops
 #                  before the outline tapers in to the post columns
-nut_af = 7.4
+nut_af = 7.2  # hex pocket across flats, NO pinch lip anywhere (user call,
+#              replacing 7.4 AF + 6.9 lip): the 7.0 nut drops in freely and
+#              sits ~0.1 mm/side centred — the lip's 0.2 mm/side float made
+#              screw start fiddly. Retention is friction only until the
+#              screw clamps the nut, so nuts are inserted at assembly time
 nut_h = 3.4
-nut_mouth_h = 1.2  # PCB nut pocket: pinch-lip depth at the plate back face
-nut_pocket_depth = 4.6  # PCB nut pocket depth into the plate: lip + nut_h;
-#                         leaves plate_t - 4.6 = 1.4 mm of front wall that
-#                         the Ø10 post directly buttresses — the nut bears
-#                         on that wall (clamp load: nut -> wall -> post)
+nut_pocket_depth = nut_h  # PCB nut pocket depth into the plate; leaves
+#                          plate_t - depth = 2.6 mm of front wall that the
+#                          Ø10 post directly buttresses — the nut bears on
+#                          that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
-tap_d = 3.4
+tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
+#             straight in; user-sized up from the 3.4 first draft)
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 #            for walls around the (since deleted) coin slots; 6 is plenty
 #            for a flat slab and drops the keyboard 2 mm
-base_front = 30  # apron towards the user, trimmed for cost: typing loads
+base_front = 25  # apron towards the user, trimmed for cost: typing loads
 #                 lean on the rear lever arm, the front pads carry little
-base_rear = 100  # rearward depth on the tilt side: longer tip-over lever arm
+#                 (forward tip lever 45 mm covers occasional pull/bump only)
+base_rear = 85  # rearward depth on the tilt side: the tip-over lever arm.
+#                Sized against the PRE-drop layout (base_rear 100 was picked
+#                before keyboard_drop existed): the keyboard sitting ~29 mm
+#                lower cut the worst-case lever h ~170 -> ~144 mm, i.e. +20%
+#                tip margin at the old footprint — 85 keeps the old margin
+#                (worst-case horizontal push at the keycap top, ~150 g board:
+#                1.35 vs 1.40 N). Floor: rear pads reach y1-22; below y1 ~ 56
+#                they slide under the boot footprint.
 base_r = 10  # base slab corner radius (plan view)
 # Junction reinforcement — vertical typing hammers the base-upright junction;
 # the junction itself is now a demountable joint (constants below).
@@ -177,10 +190,19 @@ haunch_d = 12  # full-width haunch: depth along the seat plane (was 18;
 haunch_h = 10  # haunch height above the seat plane: a shallow ramp that
 #               tops out just above the boot, keeping the boot ledge around
 #               the nut pockets open (the taller reinforcement is the ribs')
-rib_t = 12  # rib thickness (X); rib x-positions are solved automatically to
+rib_t = 14  # rib thickness (X); rib x-positions are solved automatically to
 #            clear every post AND the joint hardware; widened 8 -> 12
-#            because the 30/-35 post layout only fits two ribs
+#            (30/-35 layout) then -> 14 for ~+15% root section at +2 cm3 —
+#            the last even step that fits: at 16 the left stub slides to
+#            x=-30 and its flank crosses the key-bar keep-out (drops)
 rib_h = 70  # rib height up the back face (was 60)
+rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
+#            20): depth buys ~3x more root section than thickness at the
+#            max-moment foot; rear corner y = 26 still leaves an 8 mm wall
+#            to the derived boot rear (min 6) and the slope stays < 30 deg
+#            from vertical, self-supporting
+rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
+#            tip printed fragile and carries no load up there anyway
 pad_d = 20
 pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
 #                separate from the joint_clear key fit below)
@@ -219,15 +241,17 @@ boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             current working default: 30 deg with SET_ANGLES [-35]
+#             current working default: 30 deg with SET_ANGLES [-45]
 joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    (halved from the old 0.4 baseline — less slop on the
 #                    merged key bar; print a --part joint coupon FIRST to
 #                    verify the tighter fit before ordering full parts)
 key_l = 30  # shear key footprint: key_l along X, key_w along Y, key_h tall
 key_w = 8
-key_h = 3.2  # shorter than the boot is tall: the boot seats on the base
-#             top plane, never bottoming out on the keys
+key_h = 8  # full boot-height key, top flush with the boot top ledge: longer
+#           shear guidance, less rocking; the grooves are cut-through windows,
+#           so the key can never bottom out and the boot still seats on the
+#           seat plane, never on the keys (verified: key/boot interference 0)
 key_x = 12  # key centerline offset from the BAND MID (band_mid ± key_x —
 #            the band is asymmetric, so mid-boot anchoring keeps the merged
 #            key bar centered); keys span y ∈ (key_y0, key_y1)
@@ -235,28 +259,23 @@ key_y0, key_y1 = 12, 20
 key_chamfer = 0.5  # 45° lead-in on the key top edges
 boot_h = 8  # boot foot height; its top ledge hosts the nut pockets. 8 puts
 #            4.4 mm of wall over the pockets and stiffens the junction band
-boot_front = 0  # boot front edge flush with the plate's back face at the
-#                seat: no front lip AND no step — the plate's back face
-#                meets the boot front continuously (the old +4.5 recess
-#                left a triangular sliver gap/step at the junction). Only
-#                the boot box tracks this constant — the reinforcement
-#                wedges anchor to the back face instead (see _wedge), so
-#                moving the front cannot detach them; the lowest post's
-#                pilot exit is buried in boot/toe plastic and re-cut
-#                through it (extra bite for the self-tapper)
+# boot_front is DERIVED per instance (see __init__): the plate's front
+# surface plane continued down to the seat (-plate_t / cos(tilt)), so the
+# boot's front face IS the plate surface flush to the base — one
+# uninterrupted inclined face from the toe up through the keyboard area,
+# the raw bottom edge buried inside, no step at boot-top height, and a
+# constant post_h gap to the PCB. The old flush-with-back-face front (0)
+# needed a 45 deg lip chamfer to keep the bottom edge face printable —
+# that notch is gone. Only the boot prism (and the flange/access window
+# tracking it) uses this value — the reinforcement wedges anchor to the
+# back face instead (see _wedge), and the lowest post's pilot exit stays
+# buried in boot/toe plastic, re-cut through it (extra bite for the
+# self-tapper)
 boot_rear = 34  # boot rear edge DEFAULT (floor): each Stand derives its real
 #                 rear in __init__ from three floors — wall behind the nut
 #                 pockets, 6 mm behind the (slimmed) rib wedge feet, and the
 #                 free-standing CoM margin — and extends rearward past this
 #                 default whenever the measured CoM demands it
-lip_chamfer = 45  # 45 deg chamfer leg (mm) across the plate's lower front
-#                   lip; 0 disables. Anchored at the plate's seat-plane
-#                   corner (y=0, z=base_t) so the 45 deg face bounds the
-#                   print from layer 1: the raw bottom edge face sweeps
-#                   over the bed at (90 - tilt) from horizontal - in front
-#                   of the boot it printed as a floating ramp (0.55
-#                   mm/layer at 20 deg); at 45 deg each layer advances
-#                   <= half a line width, so the ramp is float-free
 flange_t = 0.6  # breakaway flange thickness (2 layers, --flange): stiff
 #                 enough to anchor tall prints on slick beds, snaps off
 #                 with pliers after printing
@@ -277,27 +296,26 @@ joint_screw_y = 14.5
 # leaves no room for a driver; from below the access is unobstructed, and
 # a longer screw costs nothing.
 joint_screw = 'M4x12'  # informational — printed in the BOM note, not geometry
-head_pocket_d = 8.0  # socket-head pocket in the base underside: the heads
-#                     must sit below the desk face or the base would rock
+head_pocket_d = 7.6  # socket-head pocket in the base underside: the heads
+#                     must sit below the desk face or the base would rock.
+#                     8.0 printed a visible slop ring around the user's
+#                     7.1 mm head; 7.6 halves it while still absorbing FDM
+#                     shrink + bore eccentricity when tightening
 head_pocket_h = 4.2
 boot_nut_clear = 3.6  # boot material between its bottom and the nut floor:
 #                      this pocket floor takes the clamp load — keep it
 #                      chunky, plastic creeps under a sustained bolt load
-nut_mouth_af = 6.9  # nut-pocket mouth, a hex pinch below the nut's 7.0
-#                    across flats: push the nut in past the flexing lip
-#                    and it stays with the upright. The pinch MUST be a
-#                    hex aligned with the pocket: a square mouth needs a
-#                    ~7.25 side to pass a 7.0 hex nut in-plane, so a
-#                    square opening this size just blocks the nut.
-nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out)
+nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
+#                     generous vs the 8.31 actual at 7.2 AF on purpose —
+#                     keep-outs outlive pocket dimension tweaks
 
 # --- rotation set ---------------------------------------------------------------
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
-# default 20 deg CCW in the front view, negate to mirror) sets the home-row
+# default -40 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
 # shifts the whole pattern keyboard_drop down the plate.
-SET_ANGLES = [-35]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-45]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -466,11 +484,12 @@ def joint_screw_head_pockets(xs: list[float]):
 
 def joint_nut_pockets(xs: list[float]):
     """Boot-side nut seats, one negative per screw: clearance from the boot
-    bottom up to the nut floor, a hex pocket with nut_h (0.2 mm) of
-    headroom, and a pinched mouth at the boot top so the nut snaps in and
-    stays with the upright — each angle's upright can keep its own pair."""
+    bottom up to the nut floor, then one open-topped hex pocket straight
+    through to the boot ledge — no pinch lip (deleted, see nut_af): the
+    nut drops in from the top and seats on the bearing floor. Until the
+    screw clamps it the nut is friction-held only, so drive the joint
+    screws with the stand lying on its back."""
     hex_r = (nut_af / 2) / math.cos(math.radians(30))
-    mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
     floor = boot_nut_clear  # above the boot bottom
     pockets = None
     for x in xs:
@@ -481,11 +500,9 @@ def joint_nut_pockets(xs: list[float]):
                 align=(Align.CENTER, Align.CENTER, MIN),
             )
             + Pos(0, 0, floor)
-            * extrude(RegularPolygon(hex_r, 6, major_radius=True), nut_h)
-            + Pos(0, 0, floor + nut_h)
             * extrude(
-                RegularPolygon(mouth_r, 6, major_radius=True),
-                boot_h - floor - nut_h + EPS,
+                RegularPolygon(hex_r, 6, major_radius=True),
+                boot_h - floor + EPS,
             )
         )
         pockets = pocket if pockets is None else pockets + pocket
@@ -536,9 +553,9 @@ def joint_coupon_base(stand: Stand):
 
 
 def joint_coupon_boot(stand: Stand):
-    """Fit-test coupon, boot side: groove + nut seat (floor, hex pocket,
-    pinched mouth), printed flat on what would be the seat plane. Checks
-    the groove fit and whether the nut snaps past the lip and stays."""
+    """Fit-test coupon, boot side: groove + nut seat (floor, open hex
+    pocket), printed flat on what would be the seat plane. Checks the
+    groove fit and that the 7.0 nut drops in and starts cleanly."""
     c = _coupon_box(stand, base_t, boot_h)
     c -= joint_grooves(stand.band_mid) + joint_nut_pockets(stand.joint_screw_xs)
     return Pos(0, 0, -base_t) * c  # onto the bed
@@ -702,6 +719,14 @@ class Stand:
         # boot_mid == band_mid — keys and grooves stay anchored to band_mid.
         self.boot_lo = self.slab_lo + boot_inset
         self.boot_hi = self.slab_hi - boot_inset
+        # Boot front edge (see the boot_front note by the constants): the
+        # plate's front surface plane continued down to the seat. -plate_t/ct
+        # is where that plane crosses the seat plane; from there the boot's
+        # front face rises PARALLEL to the plate, burying the raw bottom edge
+        # flush, leaving no step at boot-top height, and keeping a constant
+        # post_h gap to the PCB underside plane. Tilts toward vertical push
+        # the toe further forward (t10: -6.09); t30: -6.93.
+        self.boot_front = -plate_t / self.ct
         # The plate's bottom band is clamped to the boot footprint: the raw
         # post-need edges used to keep 2 mm of sideways overhang past the
         # narrowed boot at each bottom corner (user-flagged on a back-view
@@ -730,8 +755,9 @@ class Stand:
         )
         self.joint_screw_xs = [self.boot_lo + edge_need, self.boot_hi - edge_need]
         self.rib_x = self._auto_ribs()
-        if len(self.rib_x) < 2:
-            print(f'warning: only {len(self.rib_x)} ribs fit inside the boot')
+        if len(self.rib_x) + len(self.stub_ribs) < 2:
+            print(f'warning: only {len(self.rib_x) + len(self.stub_ribs)} '
+                  f'ribs (incl. stubs) fit inside the boot')
         # a post whose keep-box pokes past ITS side's band edge keeps a local
         # bulge tab instead of widening the whole part
         self.bulges: list[tuple[int, list[tuple[float, float]]]] = []
@@ -772,7 +798,7 @@ class Stand:
             max(
                 boot_rear,  # verified default: don't go slimmer than it
                 joint_screw_y + nut_pocket_ac / 2 + 1.5,  # nut-pocket wall
-                (rib_t + 8) + 6,  # rib foot rear y = rib_t + 8, + 6 mm wall
+                rib_foot + 6,  # rib foot rear y = rib_foot, + 6 mm wall
             )
             / 2
         ) * 2  # even mm
@@ -901,6 +927,7 @@ class Stand:
         lo = self.boot_lo + 1 + rib_t / 2
         hi = self.boot_hi - 1 - rib_t / 2
         ribs: list[float] = []
+        self.stub_ribs: list[tuple[float, float]] = []  # (x, capped height)
         for x_s in self.joint_screw_xs:
             # the key bar splits the boot, so this screw's rib must stay on
             # the screw's side of it; start right inboard of the nut pocket
@@ -916,14 +943,51 @@ class Stand:
                 x += 2.0 * inb  # post hardware in the way: slide inboard
             if s_lo <= x <= s_hi:
                 ribs.append(x)
-            else:
+                continue
+            # Full-height rib doesn't fit (pocket-post hardware vs key bar):
+            # fall back to a SHORT stub at the initial inboard position
+            # (user request). The wedge tops out below any pocket mouth
+            # overlapping its x-span, so the stub backs the junction without
+            # blocking nut insertion; it need not mirror the far rib.
+            x_stub = 2 * round((x_s + inb * rib_off) / 2)
+            if not (
+                x_stub - rib_t / 2 >= self.boot_lo + 1
+                and x_stub + rib_t / 2 <= self.boot_hi - 1
+                and (x_s >= self.band_mid or x_stub + rib_t / 2 <= key_lo - 1)
+                and (x_s <= self.band_mid or x_stub - rib_t / 2 >= key_hi + 1)
+            ):
                 print(
                     f'note: no rib fits inboard of the joint screw at '
                     f'x={x_s:g} (pocket-post hardware vs key bar) — dropped'
                 )
+                continue
+            # cap: wedge apex stays 2 mm below any pocket mouth overlapping
+            # the stub's x-span (mouth bottom z = ct·(y − ac/2) on the back
+            # face; wedge apex z = ct·h + e·st above the seat)
+            h = rib_h
+            for px, py in self.all_posts:
+                if abs(px - x_stub) < rib_t / 2 + nut_pocket_ac / 2:
+                    h = min(
+                        h,
+                        (py - nut_pocket_ac / 2)
+                        - (2.0 + 1.5 * self.st) / self.ct,
+                    )
+            if h < 25:
+                print(
+                    f'note: no room for a stub rib at x={x_stub:g} either '
+                    f'(capped height {h:.1f} < 25) — dropped'
+                )
+                continue
+            h = 2 * round(h / 2)
+            self.stub_ribs.append((x_stub, h))
+            print(
+                f'note: short rib at x={x_stub:g}, h={h:g} backs the joint '
+                f'screw at x={x_s:g} (full-height rib blocked by '
+                f'pocket-post hardware)'
+            )
         # ribs must never poke outside the boot — the fit rules above
         # guarantee it; the assert keeps future keep-out edits honest
-        for rx in ribs:
+        for rx in ribs + [x for x, _ in self.stub_ribs]:
             assert (
                 rx - rib_t / 2 >= self.boot_lo + 1
                 and rx + rib_t / 2 <= self.boot_hi - 1
@@ -931,10 +995,24 @@ class Stand:
                 f'[{self.boot_lo:g}, {self.boot_hi:g}]')
         return sorted(set(ribs))
 
+    def flare_supported(self, hole: tuple[float, float]) -> bool:
+        """A Ø15 flare foot prints only where the substrate under it is
+        continuous: the plate front face — or, for a ring dipping past the
+        plate's bottom edge, the boot's front face, which is coplanar with
+        it (the buried lip) and x-extruded across the boot span. Outside
+        that span the dipping ring would print over air, so the post falls
+        back to a plain Ø10 wall."""
+        x, y = hole
+        flare_r = post_d / 2 + 2.5
+        if y >= flare_r:
+            return True  # ring fully on the plate
+        w = math.sqrt(flare_r**2 - y**2)
+        return self.boot_lo <= x - w and x + w <= self.boot_hi
+
     def _cap_haunch(self) -> float:
         """Cap the haunch height so its ridge never runs behind a mounted
         post's back-face hardware: the screw clearance bore and, wider still, the
-        nut pocket mouth (hex ~4.3 mm major radius plus wall, hence 6.5 mm
+        nut pocket opening (hex ~4.2 mm major radius plus wall, hence 6.5 mm
         clear of the post center). Floored at 2 mm: below that the wedge is
         a negligible sliver — it only softens the junction corner, the ribs
         carry the load — so once the pattern drops (keyboard_drop) the cap
@@ -960,30 +1038,76 @@ class Stand:
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
+    def _top_corner_cuts(self):
+        """The two top-corner trim lines (see plate_and_posts for the full
+        rationale), or None when the roof is not tapered. Pure layout math,
+        shared with _taper_outline — whose hull must never swing inboard of
+        these lines (see the anchor note there)."""
+        y0 = rib_h / self.ct + taper_margin
+        if y0 >= self.plate_h:
+            return None
+        top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
+        sides = {
+            'left': min(self.all_posts, key=lambda p: p[0]),   # H4
+            'right': max(self.all_posts, key=lambda p: p[0]),  # H1
+        }
+        e = post_d / 2 + 4.5  # Ø15 flare foot radius 7.5 + 2 mm user clearance
+        cuts: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
+        normals: dict[str, tuple[float, float]] = {}
+        for name, side in sides.items():
+            dx, dy = side[0] - top[0], side[1] - top[1]
+            ln = math.hypot(dx, dy)
+            # outward unit normal: the perpendicular of top->side that
+            # points AWAY from the boot centre (band_mid, y0)
+            nx, ny = -dy / ln, dx / ln
+            if nx * (side[0] - self.band_mid) + ny * (side[1] - y0) < 0:
+                nx, ny = -nx, -ny
+            normals[name] = (nx, ny)
+            cuts[name] = (
+                (top[0] + e * nx, top[1] + e * ny),
+                (side[0] + e * nx, side[1] + e * ny),
+            )
+        return y0, cuts, normals
+
     def _taper_outline(self) -> list[tuple[float, float]]:
         """Retained outline above the full-width band: the convex hull of the
-        upper posts' keep-boxes (center +/- post_d/2 + post_edge_margin, top
-        clipped to the plate) plus the band's corners at the taper start. The
-        plate never touches the PCB, so up there it only carries the post
-        columns and the web between them — the hull is exactly that. Returns
-        [] when the band already reaches the plate top."""
+        posts' keep-boxes (center +/- post_d/2 + post_edge_margin, clamped to
+        the taper start / plate top) plus the band's corners at the taper
+        start. The plate never touches the PCB, so up there it only carries
+        the post columns and the web between them — the hull is exactly that.
+        Returns [] when the band already reaches the plate top."""
         y0 = rib_h / self.ct + taper_margin
         if y0 >= self.plate_h:
             return []
         keep = post_d / 2 + post_edge_margin
         # hull bottom corners at the per-side band edges: below the taper
         # start the plate is the (asymmetric) bottom band; post keep-boxes
-        # poking past a band edge widen the hull locally (the bulge)
+        # poking past a band edge widen the hull locally (the bulge). A post
+        # fully below the taper start keeps its x-span as a segment ON y0 —
+        # dropping it instead (the old rule) let the hull's side edge chord
+        # straight to the band corner, crossing INSIDE the top-corner cut
+        # line when the side post hangs low (t30/-40: H1 tops out at 80.4
+        # < y0 82.8) and the outline stepped line -> chord -> line just
+        # above that post (user-flagged render).
         pts = [(self.band_lo, y0), (self.band_hi, y0)]
         for x, y in self.all_posts:
-            if y + keep <= y0:
-                continue  # post stays inside the full-width band
-            pts += [
-                (x - keep, max(y - keep, y0)),
-                (x + keep, max(y - keep, y0)),
-                (x - keep, min(y + keep, self.plate_h)),
-                (x + keep, min(y + keep, self.plate_h)),
-            ]
+            lo = max(y - keep, y0)
+            hi = max(min(y + keep, self.plate_h), lo)
+            pts += [(x - keep, lo), (x + keep, lo), (x - keep, hi), (x + keep, hi)]
+        # Belt and braces for the same failure mode: anchor each side of the
+        # hull 2 mm outboard of its top-corner cut line at y0 (clamped to the
+        # blank). Both this anchor and the top post's box corner (perp. keep
+        # 10 vs the line's 9.5) sit on the OUTBOARD side of the line, and a
+        # half plane is convex — so the whole side edge between them stays
+        # outboard and the cut line remains the ONLY boundary on its side.
+        trimmed = self._top_corner_cuts()
+        if trimmed is not None:
+            _, cuts, _ = trimmed
+            for a, b in cuts.values():
+                x_at = a[0] + (y0 - a[1]) * (b[0] - a[0]) / (b[1] - a[1])
+                out = 2.0 if x_at >= self.band_mid else -2.0
+                x = min(max(x_at + out, -self.plate_half), self.plate_half)
+                pts.append((x, y0))
         return _convex_hull(pts)
 
     def plate_and_posts(self):
@@ -999,9 +1123,15 @@ class Stand:
             )
             cutter = band - Polygon(*hull, align=None)
             solid -= Pos(0, 0, -EPS) * extrude(cutter, plate_t + 2 * EPS)
+        trimmed = self._top_corner_cuts()
         # trim each side back to ITS band edge; on a side whose post keep-box
-        # pokes past it, the tab grows out of the band edge through tangent
-        # quarter-round shoulders (clear of the post keep circle)
+        # pokes past it, the tab grows out of the band edge through two 45 deg
+        # straight shoulders (user sketch — two lines replace the old tangent
+        # quarter-rounds). The lower shoulder sits SYMMETRIC to the
+        # top-corner cut line's crossing above the boss: the edge margin
+        # below the flare ring mirrors the ring's overhang past that
+        # crossing (user follow-up sketch), with a keep-clear guard for the
+        # ring (2 mm beyond its radius, 45 deg line).
         for sx in (-1, 1):
             edge = abs(self.band_edges[sx])
             over = self.plate_half - edge
@@ -1016,17 +1146,32 @@ class Stand:
                 continue
             lo0, hi0 = spans[0]
             x_in, x_out = edge, self.plate_half
-            pts = [(x_in, 0.0), (x_in, lo0 - over)]
-            pts += [
-                (x_in + sx * over * math.cos(math.radians(t)), lo0 + over * math.sin(math.radians(t)))
-                for t in range(270 + 15, 361, 15)
+            # 45 deg straight shoulders. Junction j: raised from the keep-box
+            # bottom until the edge below the boss mirrors the ring's
+            # overhang past the top-corner cut line crossing (j = 2*y_post −
+            # y_cross); clamped to the keep-box top and to a 2 mm clearance
+            # from the flare ring along the 45 deg line.
+            y_post = (lo0 + hi0) / 2  # boss center of the poking post
+            j = lo0
+            if trimmed is not None:
+                _, cuts_, _ = trimmed
+                a, b = cuts_['left' if sx < 0 else 'right']
+                y_cross = a[1] + (x_out - a[0]) * (b[1] - a[1]) / (b[0] - a[0])
+                j = max(lo0, min(
+                    2 * y_post - y_cross,
+                    hi0,
+                    y_post + over - (post_d / 2 + 4.5) * math.sqrt(2),
+                ))
+            pts = [
+                (x_in, 0.0),
+                (x_in, j - over),
+                (x_out, j),
+                (x_out, hi0),
+                (x_in, hi0 + over),
+                (x_in, self.plate_h),
+                (x_out, self.plate_h),
+                (x_out, 0.0),
             ]
-            pts += [(x_out, hi0)]
-            pts += [
-                (x_in + sx * over * math.cos(math.radians(t)), hi0 + over * math.sin(math.radians(t)))
-                for t in range(15, 91, 15)
-            ]
-            pts += [(x_in, self.plate_h), (x_out, self.plate_h), (x_out, 0.0)]
             if sx < 0:
                 pts = [(-x, y) for x, y in reversed(pts)]
             solid -= Pos(0, 0, -EPS) * extrude(
@@ -1048,32 +1193,12 @@ class Stand:
         # the lines covers the top post's boss. Anchors derive from the post
         # layout, so they track layout changes; the post-clearance guard
         # below is the tripwire that fails loudly if a future layout ever
-        # walks a nut pocket into a line.
-        y0 = rib_h / self.ct + taper_margin
-        if y0 < self.plate_h:  # only when the roof is actually tapered
+        # walks a nut pocket into a line. Line math lives in
+        # _top_corner_cuts (shared with _taper_outline, whose hull is kept
+        # outboard of these lines — see the anchor note there).
+        if trimmed is not None:  # only when the roof is actually tapered
+            y0, cuts, normals = trimmed
             top = max(self.all_posts, key=lambda p: p[1])  # H2: top post
-            sides = {
-                'left': min(self.all_posts, key=lambda p: p[0]),   # H4
-                'right': max(self.all_posts, key=lambda p: p[0]),  # H1
-            }
-            e = post_d / 2 + 4.5  # Ø15 flare foot radius 7.5 + 2 mm user
-            # clearance; the first 7 mm offset shaved the flare's outer
-            # seat flat (user-flagged)
-            cuts: dict[str, tuple[tuple[float, float], tuple[float, float]]] = {}
-            normals: dict[str, tuple[float, float]] = {}
-            for name, side in sides.items():
-                dx, dy = side[0] - top[0], side[1] - top[1]
-                ln = math.hypot(dx, dy)
-                # outward unit normal: the perpendicular of top->side that
-                # points AWAY from the boot centre (band_mid, y0)
-                nx, ny = -dy / ln, dx / ln
-                if nx * (side[0] - self.band_mid) + ny * (side[1] - y0) < 0:
-                    nx, ny = -nx, -ny
-                normals[name] = (nx, ny)
-                cuts[name] = (
-                    (top[0] + e * nx, top[1] + e * ny),
-                    (side[0] + e * nx, side[1] + e * ny),
-                )
             assert all(
                 math.isfinite(v) for a, b in cuts.values() for v in a + b
             ), 'top-corner cut line anchors are not finite'
@@ -1108,8 +1233,8 @@ class Stand:
             # GUARD: the cuts intentionally pass closer to the posts than
             # the taper's 10 mm keep, but a back-face nut pocket must never
             # be clipped: every post center keeps >= 6.5 mm to both lines
-            # (pocket across-corner radius 4.27 + pinch lip + wall margin,
-            # the figure the haunch cap uses). The top/side posts sit at
+            # (pocket across-corner radius 4.16 + wall margin, the figure
+            # the haunch cap uses). The top/side posts sit at
             # exactly e = 7.0 mm on their own side's line — that is the
             # design, not a violation. A layout change that violates this
             # must fail loudly, not silently shave a pocket.
@@ -1129,7 +1254,7 @@ class Stand:
                     sys.exit(
                         f'error: top-corner cut {name} passes within '
                         f'{min(dists):.2f} mm of a post center (guard '
-                        f'{cut_guard} mm = nut pocket 4.27 + lip + margin); '
+                        f'{cut_guard} mm = nut pocket 4.16 + margin); '
                         f'distances: {listing}'
                     )
             # through-thickness polygon extrusions, same EPS style as the
@@ -1149,19 +1274,50 @@ class Stand:
                     _half_plane_cutter(a, b, x_lo, x_hi, 0.0, self.plate_h + ext),
                     plate_t + 2 * EPS,
                 )
+            # Soften the four corners the cut lines leave behind (user: the
+            # sharp edges feel harsh and the ridge apex is a knock-prone
+            # stress point). Each cut face contributes two plate-thickness
+            # edges — one at the ridge apex, one at the lower junction with
+            # the plate edge. Fillet all four together, backing the radius
+            # off if OCC refuses (the two ridge corners can sit close
+            # together on narrow caps).
+            corner_edges = []
+            for _name, (a, b) in cuts.items():
+                ux, uy = b[0] - a[0], b[1] - a[1]
+                ln = math.hypot(ux, uy)
+                corner_edges += [
+                    e
+                    for e in solid.edges()
+                    if abs(e.length - plate_t) < 1e-3
+                    and abs(ux * (e.center().Y - a[1])
+                            - uy * (e.center().X - a[0])) / ln < 1e-4
+                ]
+            assert len(corner_edges) == 4, (
+                f'expected 4 cut-line corner edges, found {len(corner_edges)}'
+            )
+            for r in (3.5, 2.5, 1.5):
+                try:
+                    solid = fillet(corner_edges, r)
+                    print(f'note: cut-line corners rounded r={r} (4 edges)')
+                    break
+                except Exception:
+                    continue
+            else:
+                print('warning: cut-line corner rounding failed — left sharp')
         for hole in self.all_posts:
             x, y = hole
             post = Pos(x, y, plate_t) * Cylinder(
                 post_d / 2, self.post_h, align=(Align.CENTER, Align.CENTER, MIN)
             )
-            if hole != self.lowest_post:
+            if hole != self.lowest_post or self.flare_supported(hole):
                 # 45 deg flare (Ø15 foot ring) where the standoff meets the
-                # plate: adhesion-friendly transition, self-supporting. The
-                # lowest post stays a plain cylinder: it is self-tapped
-                # anyway, and at this drop its flare foot would overhang the
-                # plate's bottom edge (center y ~ 5.6, foot to y ~ -1.9) and
-                # get clipped into a half-trumpet lump by the y >= 0 clip
-                # below; a plain Ø10 cylinder wall prints fine.
+                # plate: adhesion-friendly transition, self-supporting.
+                # Restored for the lowest post too (user): its ring dips
+                # past the plate's bottom edge, and there it prints on the
+                # boot's front face — coplanar with the plate front since
+                # the buried lip. Only a hypothetical layout whose dipping
+                # ring would leave the boot's x-span falls back to a plain
+                # cylinder (as the lowest post used to be).
                 post += Pos(x, y, plate_t) * Cone(
                     post_d / 2 + 2.5,
                     post_d / 2,
@@ -1169,21 +1325,6 @@ class Stand:
                     align=(Align.CENTER, Align.CENTER, MIN),
                 )
             solid += post
-        # Flare clip: a deep pattern can park a post's Ø15 flare foot past
-        # the plate's bottom edge (t30/-35 at drop 30: the lowest post
-        # centers at y ~ 5.6, its flare would reach y ~ -1.9 — that post
-        # gets no flare at all now, see above, so this only backstops other
-        # layouts/tilts). The plate itself already spans y >= 0, so
-        # intersect the finished solid with a generous y >= 0 box: any
-        # overhanging flare is trimmed flush with the plate's bottom edge —
-        # a straight vertical clip face, printable; the post top's bearing
-        # area is untouched.
-        solid &= Pos(-self.plate_half - 20, 0, -20) * Box(
-            self.plate_w + 40,
-            self.plate_h + 20,
-            plate_t + self.post_h + 40,
-            align=(Align.MIN, Align.MIN, Align.MIN),
-        )
         top = self.face_z
         for hole in self.all_posts:
             x, y = hole
@@ -1206,26 +1347,19 @@ class Stand:
                 # Clamp from the back: the post top stays SOLID and bears the
                 # PCB; the M4 nut lives in a hex pocket opened at the plate's
                 # BACK face, radially inside the post footprint. The screw
-                # (M4x12: grip PCB 1.6 + post 3 + wall 1.4 ≈ 6 mm + 3.4 nut)
+                # (M4x12: grip PCB 1.6 + post 3 + wall 2.6 ≈ 7.2 mm + 3.2 nut)
                 # comes through the board and pulls the nut against the
-                # 1.4 mm front wall the post directly buttresses — load path
+                # 2.6 mm front wall the post directly buttresses — load path
                 # nut -> wall -> post, pure compression, no printed bridge.
-                # The mouth is a hex pinch (nut_mouth_af < nut across flats,
-                # aligned with the pocket hex) so the nut snaps in from the
-                # back and stays with the upright. The screw passes through
-                # the pocket volume; both are cuts, so that is fine.
+                # No pinch lip (deleted, see nut_af): the 7.2 AF pocket is a
+                # light slide fit, so nuts are inserted plate-back-up at PCB
+                # assembly and stay by friction until the screw clamps them.
+                # The screw passes through the pocket volume; both are cuts,
+                # so that is fine.
                 hex_r = (nut_af / 2) / math.cos(math.radians(30))
-                mouth_r = (nut_mouth_af / 2) / math.cos(math.radians(30))
-                solid -= Pos(x, y, -EPS) * (
-                    extrude(
-                        RegularPolygon(mouth_r, 6, major_radius=True),
-                        nut_mouth_h + EPS,
-                    )
-                    + Pos(0, 0, nut_mouth_h)
-                    * extrude(
-                        RegularPolygon(hex_r, 6, major_radius=True),
-                        nut_pocket_depth - nut_mouth_h,
-                    )
+                solid -= Pos(x, y, -EPS) * extrude(
+                    RegularPolygon(hex_r, 6, major_radius=True),
+                    nut_pocket_depth + EPS,
                 )
                 # screw clearance: back face through plate + post, out the top
                 solid -= Pos(x, y, -EPS) * Cylinder(
@@ -1286,33 +1420,17 @@ class Stand:
 
     def upright_solid(self):
         """The demountable half: everything above the seat plane, printed
-        boot-down on the bed. Exported pose is the print pose; layer-by-layer
-        audits (facets + per-layer float) show no bridging and no air-start
-        once the front lip is chamfered."""
+        boot-down on the bed (slicer drops the STL's boot face to z=0).
+        Layer-by-layer audits (facets + per-layer float) show no bridging
+        and no air-start: the raw plate bottom edge is buried inside the
+        forward-extended boot, so nothing sweeps over the bed but full
+        walls."""
         rad = math.radians(self.tilt)
         body = (
             Pos(0, 0, self.origin_z)
             * Rot(X=90 - self.tilt)
             * self.plate_and_posts()
         )
-        if lip_chamfer > 0:
-            # Cut the plate's lower front lip at 45 deg (see lip_chamfer).
-            # Applied before the boot union: the cut spans world y <= 0,
-            # entirely in front of the boot footprint (front +4.5), so the
-            # boot itself is untouched.
-            body -= (
-                Pos(-(self.plate_w + 20) / 2, 0, 0)
-                * extrude(
-                    Plane.YZ
-                    * Polygon(
-                        (0, base_t),
-                        (-lip_chamfer, base_t + lip_chamfer),
-                        (-lip_chamfer, base_t),
-                        align=None,
-                    ),
-                    self.plate_w + 20,
-                )
-            )
         # boot + haunch + ribs span the boot footprint: the slab inset by
         # boot_inset per side, so the foot sits fully on the slab's flat top
         # inside the base_top_fillet round-over (the plate band is clamped
@@ -1320,11 +1438,23 @@ class Stand:
         # 1.5 mm — the screws hug the boot edges by construction (see
         # __init__).
         boot_w = self.boot_hi - self.boot_lo
-        boot = Pos(
-            (self.boot_lo + self.boot_hi) / 2,
-            (boot_front + self.boot_rear) / 2,
-            base_t + boot_h / 2,
-        ) * Box(boot_w, self.boot_rear - boot_front, boot_h)
+        # Front face = the PLATE's front surface continued down to the seat
+        # (user sketch): from the toe at (boot_front, base_t) the face rises
+        # parallel to the plate, so the top front edge lands exactly on the
+        # plate front face at boot-top height — one uninterrupted surface,
+        # no step, constant post_h gap to the PCB. YZ trapezoid, not a box,
+        # for that inclined front.
+        boot = Pos(self.boot_lo, 0, 0) * extrude(
+            Plane.YZ
+            * Polygon(
+                (self.boot_front, base_t),
+                (self.boot_rear, base_t),
+                (self.boot_rear, base_t + boot_h),
+                (self.boot_front + boot_h * self.st / self.ct,
+                 base_t + boot_h),
+            ),
+            boot_w,
+        )
         # Boot-wide haunch: a shallow ramp up the back face that tops out
         # just above the boot (haunch_h), filling the junction inner
         # corner. y anchor 0 = the backplate's back face; the wedge
@@ -1335,34 +1465,38 @@ class Stand:
             Plane.YZ * self._wedge(haunch_d, self.haunch_h, rad), boot_w
         )
         # Ribs continue up the back face into the hammering zone, same
-        # back-face anchor. Wedge base depth rib_t + 8 (slimmed from +18
-        # after the first print): the base rear corner reaches
-        # y = rib_t + 8 = 20 from the seat origin, and the derived boot
-        # rear keeps a 6 mm wall behind it.
-        for rx in self.rib_x:
+        # back-face anchor. Wedge base depth rib_foot (first print wanted
+        # the foot slim, but the max-moment root buys more from depth than
+        # from thickness): the base rear corner reaches y = rib_foot = 26
+        # from the seat origin, and the derived boot rear keeps a 6 mm
+        # wall behind it. Apex truncated to rib_top_flat — the zero-width
+        # tip printed fragile and adds no stiffness there.
+        for rx, rh in [(rx, rib_h) for rx in self.rib_x] + self.stub_ribs:
             boot += Pos(rx - rib_t / 2, 0, base_t) * extrude(
-                Plane.YZ * self._wedge(rib_t + 8, rib_h, rad), rib_t
+                Plane.YZ * self._wedge(rib_foot, rh, rad, rib_top_flat),
+                rib_t,
             )
         # keyboard_drop can park the lowest POCKET post's back-face nut
-        # pocket inside the boot's z-band (t30/-35 drop 20: mouth spans
-        # world z 8.4..15.3 vs boot top 14), burying its pinch mouth. Cut
-        # an access window through the boot in front of that pocket: the
-        # nut slides in with tweezers, and the pinch lip — which lives in
-        # the plate — still retains it. Boot-only cut, applied before the
-        # union, so the plate's pocket and nut seat stay intact. With
-        # lowest_post_tapped = True the lowest post has a plain self-tap
-        # pilot (no pocket, no access needed), so this auto-skips whenever
-        # the lowest POCKET clears the boot top on its own (drop 30 /
-        # t30/-35: lowest pocket mouth z ~ 47 mm).
+        # pocket inside the boot's z-band (t30/-35 drop 20: opening spans
+        # world z 8.4..15.3 vs boot top 14), leaving the pocket unreachable
+        # from behind. Cut an access window through the boot in front of
+        # that pocket: the nut slides in with tweezers. Boot-only cut,
+        # applied before the union, so the plate's pocket stays intact.
+        # With lowest_post_tapped = True the lowest post has a plain
+        # self-tap pilot (no pocket, no access needed), so this auto-skips
+        # whenever the lowest POCKET clears the boot top on its own (drop
+        # 30 / t30/-35: lowest pocket opening z ~ 47 mm).
         lo_x, lo_y = min(self.pocket_posts, key=lambda p: p[1])
-        if (lo_y - 3.98) * self.ct < boot_h + 0.5:
-            # rear edge = mouth rear (lo_y*st + 4*st) plus nut body + margin
+        pocket_ac_r = (nut_af / 2) / math.cos(math.radians(30))
+        if (lo_y - pocket_ac_r) * self.ct < boot_h + 0.5:
+            # rear edge = opening rear (lo_y*st + 4*st) plus nut body + margin
             win_y1 = (lo_y + 4.0) * self.st + 2.0
-            boot -= Pos(lo_x - 5.5, boot_front, base_t - EPS) * Box(
-                11.0, win_y1 - boot_front, boot_h + 2 * EPS,
+            boot -= Pos(lo_x - 5.5, self.boot_front, base_t - EPS) * Box(
+                11.0, win_y1 - self.boot_front, boot_h + 2 * EPS,
                 align=(Align.MIN, Align.MIN, MIN),
             )
         body += boot
+        body = self._fillet_rib_seams(body)
         if self.flange_w > 0:
             body += self._breakaway_flange()
         body -= joint_grooves(self.band_mid)
@@ -1388,7 +1522,8 @@ class Stand:
         body -= Pos(0, 0, base_t - 25) * Box(400, 400, 50)
         return body
 
-    def _wedge(self, depth: float, height: float, rad: float):
+    def _wedge(self, depth: float, height: float, rad: float,
+               top_flat: float = 0.0):
         """Reinforcement wedge profile in the YZ plane, anchored to the
         backplate's BACK FACE, not the boot front (anchoring at the recessed
         boot front (+4.5) had dragged rib and haunch ~4.5 mm rearward: they
@@ -1403,10 +1538,10 @@ class Stand:
         P1-P2 runs parallel to the back face, e = 1.5 mm perpendicular
         inside it: full-height contact with the plate regardless of
         boot_front. P1 is slid e / cos along the seat plane so the base
-        edge lies flat ON it — over the boot aft of y = 4.5, and on the
-        bed across the ~1.7 mm strip in front of the 45 deg lip chamfer
-        (first-layer material; the face above leans back at tilt from
-        vertical, self-supporting). Putting P1 at the perpendicular foot
+        edge lies flat ON it — entirely on the boot, whose front edge now
+        reaches forward of the plate's back face (buried lip; first-layer
+        material; the face above leans back at tilt from vertical,
+        self-supporting). Putting P1 at the perpendicular foot
         instead (e * sin up) would float that strip's base edge over the
         recessed boot-front pocket. The hypotenuse faces up-forward
         throughout (rib: leans back ~12.6 deg from vertical; haunch:
@@ -1417,30 +1552,92 @@ class Stand:
         """
         e = 1.5  # perpendicular embed into the backplate
         s, c = math.sin(rad), math.cos(rad)
-        return Polygon(
-            (-e / c, 0),
-            (depth, 0),
-            (height * s - e * c, height * c + e * s),
-            align=None,
-        )
+        p1 = (-e / c, 0)
+        p3 = (depth, 0)
+        p2 = (height * s - e * c, height * c + e * s)
+        if 0 < top_flat < depth + e / c - 0.5:
+            # truncate the knife apex with a flat ~top_flat wide, parallel
+            # to the base (horizontal in print pose): same width would be
+            # approached only in the last fractional layers anyway
+            zc = p2[1] * (1 - top_flat / (depth + e / c))
+            f = zc / p2[1]
+            p1t = (p1[0] + (p2[0] - p1[0]) * f, zc)
+            p3t = (p3[0] + (p2[0] - p3[0]) * f, zc)
+            return Polygon(p1, p3, p3t, p1t, align=None)
+        return Polygon(p1, p3, p2, align=None)
+
+    def _rib_seam(self, body, xf):
+        """The rib-flank / back-face seam edge at flank x = xf, or None.
+        Geometric selection (flank X, long, parallel to the plate's up
+        direction (0, st, ct)): the haunch-ramp and boot-ledge junctions
+        at the same X fail these tests, as do the top-corner cut edges."""
+        for e in body.edges():
+            vs = e.vertices()
+            if len(vs) != 2:
+                continue
+            (x1, y1, z1), (x2, y2, z2) = [(v.X, v.Y, v.Z) for v in vs]
+            dx, dy, dz = x2 - x1, y2 - y1, z2 - z1
+            ln = math.sqrt(dx * dx + dy * dy + dz * dz)
+            if ln < 10 or abs(dx) / ln > 0.05:
+                continue
+            if abs(dy * self.st + dz * self.ct) / ln < 0.99:
+                continue
+            if abs(x1 - xf) < 0.3 and abs(x2 - xf) < 0.3:
+                return e
+        return None
+
+    def _fillet_rib_seams(self, body):
+        """Concave fillet down each rib flank's seam with the backplate's
+        back face: hammering loads concentrate at those vertical corners,
+        and the fillet both softens the concentration and adds root
+        section. The seams only exist after the boot union, so this runs
+        on the merged body. Concave and parallel to the layer stack:
+        prints support-free. OCC refuses simultaneous fillets on disjoint
+        seams even where each succeeds alone, so they are done one flank
+        at a time, backing the radius off on refusal (same policy as the
+        cut-line corners); a flank that fails everywhere stays sharp — a
+        lost refinement, not a regression."""
+        flanks = [
+            rx + w
+            for rx, _ in [(x, rib_h) for x in self.rib_x] + self.stub_ribs
+            for w in (-rib_t / 2, rib_t / 2)
+        ]
+        radii = []
+        for xf in flanks:
+            for r in (3.0, 2.5, 2.0, 1.5):
+                seam = self._rib_seam(body, xf)
+                if seam is None:
+                    break  # no seam at this flank (layout change) — skip
+                try:
+                    body = fillet([seam], r)
+                    radii.append(r)
+                    break
+                except Exception:
+                    continue
+        if len(radii) == len(flanks):
+            rs = '/'.join(f'{r:g}' for r in sorted(set(radii)))
+            print(f'note: rib seam fillet r={rs} ({len(radii)} seams)')
+        else:
+            print(f'warning: rib seam fillet on {len(radii)}/{len(flanks)} '
+                  f'seams only — rest left sharp')
+        return body
 
     def _breakaway_flange(self):
         """Thin ring around the boot footprint (--flange): bed-adhesion
         insurance for slick plates. flange_t tall so it snaps off with
-        pliers after printing; added after the lip chamfer cut, so the two
-        never interact, and clear of every joint feature. Follows the boot
-        footprint (the band inset by boot_inset), so it centers on the
-        band's mid-x too."""
+        pliers after printing, and clear of every joint feature. Follows
+        the boot footprint (the band inset by boot_inset, front edge
+        included), so it centers on the band's mid-x too."""
         boot_w = self.boot_hi - self.boot_lo
         outer = RectangleRounded(
             boot_w + 2 * self.flange_w,
-            self.boot_rear - boot_front + 2 * self.flange_w,
+            self.boot_rear - self.boot_front + 2 * self.flange_w,
             4,
         )
-        inner = Rectangle(boot_w, self.boot_rear - boot_front)
+        inner = Rectangle(boot_w, self.boot_rear - self.boot_front)
         return Pos(
             (self.boot_lo + self.boot_hi) / 2,
-            (boot_front + self.boot_rear) / 2,
+            (self.boot_front + self.boot_rear) / 2,
             base_t,
         ) * extrude(outer - inner, flange_t)
 
@@ -1639,14 +1836,16 @@ def main() -> None:
         key_xs = [round(stand.band_mid + s * key_x, 1) for s in (-1, 1)]
         print(
             f'ribs at x = {[round(x, 1) for x in stand.rib_x]}'
-            f'  | haunch_h = {stand.haunch_h:.1f} mm'
+            + (f' + stubs {[(round(a, 1), round(b, 1)) for a, b in stand.stub_ribs]}'
+               if stand.stub_ribs else '')
+            + f'  | haunch_h = {stand.haunch_h:.1f} mm'
             f'  | joint: keys x = {key_xs}, '
             f'screws x = {[round(x, 1) for x in stand.joint_screw_xs]} '
             f'({joint_screw} from below)'
         )
         print(
             f'boot: x [{stand.boot_lo:g}, {stand.boot_hi:g}], '
-            f'front {boot_front:g}, rear {stand.boot_rear:g} mm'
+            f'front {stand.boot_front:g}, rear {stand.boot_rear:g} mm'
             f'  | CoM y {stand.com_y:.1f} mm, rear margin '
             f'{stand.boot_rear - stand.com_y:.1f} mm'
         )

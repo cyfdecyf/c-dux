@@ -30,7 +30,7 @@ cd ergogen && ergogen .    # 也是 VS Code 默认构建任务（.vscode/tasks.j
 cd case/build123d
 uv sync                         # 首次；按 uv.lock 建 .venv（build123d 0.11.1）
 uv run stand.py --part base     # 共享底座（打印一次，不分左右）
-uv run stand.py --part upright  # 左立板，默认 30° 后仰（set-angles −35）；--side right 出右立板
+uv run stand.py --part upright  # 左立板，默认 30° 后仰（set-angles −40）；--side right 出右立板
 uv run stand.py --part joint    # 配合试块（下整件订单前先打这个验证公差）
 uv run stand.py --part upright --tilt 10,15,20,25,30 --step   # 批量角度 + STEP
 uv run stand.py --show          # 只推送 OCP CAD Viewer 预览，不导出文件
@@ -77,7 +77,7 @@ cd case/build123d && ruff check stand.py    # 配置在 ruff.toml（行宽 90、
 ### 底座几何
 
 两件式结构：共享底座（对称、不分左右、只打印一次）+ 按后仰角的立板（背板 + 4 柱 + 靴座），榫键 + 2×M4 从底面拧接，换后仰角只重打立板。
-背板上 1 组 M4 柱位（平面内旋转默认 −35°，`--set-angles` 可改）决定 home row 倾斜；
+背板上 1 组 M4 柱位（平面内旋转默认 −40°，`--set-angles` 可改）决定 home row 倾斜；
 柱位由求解器自动排布（横向居中、旋转后板角距底座顶面 ≥2 mm），背板高度按覆盖最高螺丝孔离桌面的垂直投影加余量（`top_rim`）取值，轮廓在肋带以上自动收腰为柱位包络凸包（PCB 悬在柱前端、不接触板面），加强肋位置亦自动避让柱位。
 几何参数是 `stand.py` 顶部的模块常量。
 
@@ -90,7 +90,7 @@ cd case/build123d && ruff check stand.py    # 配置在 ruff.toml（行宽 90、
 
 ## 约定
 
-- 提交信息用英文，带区域前缀，如 `case/build123d: ...`、`image: ...`
+- 提交信息用中文，带区域前缀，如 `case/build123d: ...`、`image: ...`
 - 注释/文档语言跟随各文件现状：`stand.py` 用英文，`case/build123d/README.md` 用中文，根 `README.md` 用英文
 - 根 README 的「Tips for using Ergogen with KiCAD」记录了非按键封装的定位工作流
   - Ergogen 任意位置生成 → KiCad 鼠标摆放 → 标尺量相对位置 → 回填 yaml
