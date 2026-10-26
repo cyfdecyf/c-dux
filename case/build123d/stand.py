@@ -203,25 +203,13 @@ rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
 #            from vertical, self-supporting
 rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
 #            tip printed fragile and carries no load up there anyway
-pad_d = 20
-pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
-#                separate from the joint_clear key fit below)
-pad_t = 1.0  # purchased self-adhesive TPU pad thickness
-pad_protrude = 0.4  # pad face above the desk face: keeps the pads the ONLY
-#                     desk contact (the tip-over pivots) across die-cut
-#                     thickness tolerance — TPU compression at keyboard
-#                     loads is microns, the tolerance is the driver
-pad_recess = pad_t - pad_protrude  # 0.6 pocket depth
-pad_ring_w = 5  # flat glue annulus at pad_recess; the centre is relieved
-#                pad_relief deeper, so droop/fall strands from the recess
-#                ceiling land in the relief, never under the pad's glue ring
-pad_relief = 1.0  # centre-recess headroom below the glue ring plane: the
-#                  recess ceiling is a short Ø10.2 bridge (was Ø20.4) and
-#                  its strands stop 1 mm short of the pad back
-pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
-#              as this allows — the tip-over pivots are the PAD contact lines,
-#              so every mm outward is a mm of tip lever (was 4: keep-out, not
-#              stability; 2 mm still leaves the 0.6 mm recess fully on flat)
+# The base underside is a plain flat face: the Ø20 two-level pad pockets kept
+# failing in print (recess-ceiling droop / strands fouling the glue face), so
+# they are gone. The 1 mm self-adhesive TPU pads now glue straight onto the
+# flat floor, placed by hand hugging the slab edges as before — the pad faces
+# sit pad_t proud of the desk, so the pads stay the ONLY desk contact (the
+# tip-over pivots), and every mm of outward placement is a mm of tip lever.
+pad_t = 1.0  # purchased self-adhesive TPU pad thickness (glued on flat)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 #                              slab's flat top, inside the 2 mm perimeter
@@ -1024,18 +1012,6 @@ class Stand:
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(2.0, min(haunch_h, h))
 
-    # -- keyboard-plate frame helpers -----------------------------------------
-
-    def pad_positions(self) -> list[tuple[float, float]]:
-        # per-side x: the slab IS the raw (asymmetric) post-need footprint,
-        # so each side's pad row hugs ITS slab edge — unaffected by the band
-        # clamp (the base does not change when the plate band is trimmed)
-        px_lo = self.slab_lo + base_r + pad_edge
-        px_hi = self.slab_hi - base_r - pad_edge
-        fy = self.y0 + base_r + pad_edge
-        ry = self.y1 - base_r - pad_edge
-        return [(px_lo, fy), (px_hi, fy), (0, fy), (px_lo, ry), (px_hi, ry), (0, ry)]
-
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
     def _top_corner_cuts(self):
@@ -1387,30 +1363,8 @@ class Stand:
         ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
-        for px, py in self.pad_positions():
-            # Pad pocket, two levels: a flat glue annulus (width pad_ring_w)
-            # at pad_recess inside the straight capture wall at
-            # pad_d + 2*pad_fit, plus a centre relief pad_relief deeper
-            # (vertical step — a narrowing cone would add a 45° overhang
-            # per layer where a hole wall is free). A former relief slot +
-            # glue lands kept the ceiling from sagging, but the lands stood
-            # 0.4 mm proud of the floor and kept the pad from seating —
-            # here the glue ring IS the floor, flush everywhere. Droop or
-            # detached strands from the recess ceiling fall through the
-            # relief and out of the pocket mouth instead of onto the glue
-            # face; the ring itself is a wall-anchored cantilever whose
-            # droop bends into the relief, away from the pad.
-            ro = pad_d / 2 + pad_fit
-            pocket = Pos(px, py, -EPS) * Cylinder(
-                ro, pad_recess + EPS, align=(Align.CENTER, Align.CENTER, MIN)
-            )
-            base -= pocket
-            relief = Pos(px, py, -EPS) * Cylinder(
-                ro - pad_ring_w,
-                pad_recess + pad_relief + EPS,
-                align=(Align.CENTER, Align.CENTER, MIN),
-            )
-            base -= relief
+        # no pad pockets — the underside stays flat (pockets kept failing in
+        # print); the TPU pads glue straight onto it at assembly
         base += joint_keys(self.band_mid)
         base -= joint_screw_bores(self.joint_screw_xs)
         base -= joint_screw_head_pockets(self.joint_screw_xs)
