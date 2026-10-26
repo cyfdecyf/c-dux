@@ -263,7 +263,7 @@ uv run stand.py --set-angles -45           # 安装组平面内旋转角(默认 
 
 ## 键盘离台高度与底座尺寸
 
-![底座 front/rear/进深与抗倾力臂示意](../../images/stand-base-dimensions.png)
+![底座 front/rear/进深与抗倾力臂示意](./images/stand-base-dimensions.png)
 （由 `base_dims_diagram.py` 从 `stand.py` 常量自动生成，
 `uv run base_dims_diagram.py` 重新出图；PNG 需要系统装 rsvg-convert）
 
