@@ -38,7 +38,7 @@ Highlights over the retired OpenSCAD version:
     posts carry the same flare. The haunch toe now wraps the pilot's
     rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default -45 deg in-plane rotation = home-row slope), and the backplate
+    default -53 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -53,11 +53,12 @@ flipped vs the KiCad view per the mounting orientation above:
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default -45 deg CCW in the front view; negate to
+centroid by --set-angles (default -53 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest outline point (real Edge.Cuts material —
-the bbox corner holds no board) clears the base top by 2 mm, then shifts
-the whole pattern keyboard_drop down the plate (user-measured).
+the bbox corner holds no board) clears the base top by SLIDE_TOP_MARGIN
+(1.5 mm along the plate plane), then shifts the whole pattern
+keyboard_drop down the plate (user-measured).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
@@ -132,11 +133,12 @@ plate_margin = 10
 bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  v_floor keeps the board's lowest outline point clear of
 #                  the base top, and keyboard_drop eats most of that margin
-keyboard_drop = 33.0  # whole mounting pattern shifted DOWN the plate by this
-# much (initially a user-measured 30; raised to 33 so the slide-margin floor
-# actually BINDS at t30/-45 and squeezes the upright: the solver lifts the
-# pattern just enough to hold the floor, so the NET drop auto-caps —
-# t30/-45: lift ~0.11, net ~32.9, lowest point z ~ 7.30 (slide margin 1.5).
+keyboard_drop = 35.5  # whole mounting pattern shifted DOWN the plate by this
+# much (user-measured 30, then 33 at t30/-45; re-raised to 35.5 for t30/-53
+# so the slide-margin floor BINDS again and the keyboard sits as low as the
+# 1.5 mm slide margin allows: the solver lifts the pattern just enough to
+# hold the floor, so the NET drop auto-caps —
+# t30/-53: lift ~0.00, net ~35.5, lowest point z ~ 7.3 (slide margin 1.5).
 # The old 20 cap guarded the lowest post's back-face nut pocket vs the boot
 # top; lowest_post_tapped = True removes it)
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
@@ -245,7 +247,7 @@ boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             current working default: 30 deg with SET_ANGLES [-45]
+#             current working default: 30 deg with SET_ANGLES [-53]
 joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    (halved from the old 0.4 baseline — less slop on the
 #                    merged key bar; print a --part joint coupon FIRST to
@@ -315,12 +317,12 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
 
 # --- rotation set ---------------------------------------------------------------
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
-# default -40 deg CCW in the front view, negate to mirror) sets the home-row
+# default -53 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
 # board's lowest outline point clears the base top by SLIDE_TOP_MARGIN
 # (measured along the plate plane), then
 # shifts the whole pattern keyboard_drop down the plate.
-SET_ANGLES = [-45]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-53]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -864,7 +866,7 @@ class Stand:
         lower on the plate (user request; with lowest_post_tapped the
         outline floor is the only limit — the solver lifts the pattern
         just enough to hold it, so the NET drop is keyboard_drop minus
-        that lift, ~32.9 mm at the default drop 33).
+        that lift, ~35.5 mm at the default drop 35.5).
         Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
@@ -1011,9 +1013,17 @@ class Stand:
                 continue
             # cap: wedge apex stays 2 mm below any pocket mouth overlapping
             # the stub's x-span (mouth bottom z = ct·(y − ac/2) on the back
-            # face; wedge apex z = ct·h + e·st above the seat)
+            # face; wedge apex z = ct·h + e·st above the seat). Posts at or
+            # below the boot top (back-face height 8/ct above the seat) are
+            # skipped: the wedge is submerged inside the boot there, so it
+            # cannot block their hardware (t30/−53: H3 y 6.8 sits inside the
+            # boot band — treating it like a pocket post produced a bogus
+            # −0.7 cap that killed this rib; the tapped lowest post has no
+            # pocket and needs no rear access anyway).
             h = rib_h
             for px, py in self.all_posts:
+                if py <= 8.0 / self.ct:
+                    continue
                 if abs(px - x_stub) < rib_t / 2 + nut_pocket_ac / 2:
                     h = min(
                         h,

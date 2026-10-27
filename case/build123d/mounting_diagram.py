@@ -12,8 +12,8 @@ Two panels, both true to the current single-post-group design:
           plate_and_posts(); H3 annotated as the self-tapping pilot.
 
 Usage:
-    uv run mounting_diagram.py                     # defaults: t30 / -45
-    uv run mounting_diagram.py --set-angles=-45 --out images/mounting.png
+    uv run mounting_diagram.py                     # defaults: t30 / -53
+    uv run mounting_diagram.py --set-angles=-53 --out images/mounting.png
 """
 
 from __future__ import annotations
