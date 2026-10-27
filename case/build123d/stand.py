@@ -63,6 +63,7 @@ keyboard_drop down the plate (user-measured).
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
     uv run stand.py --part base              # shared base slab (print once)
+    uv run stand.py --part base --pad-pockets  # ... with 4 corner pad pockets
     uv run stand.py --part upright           # left upright, 30 deg recline
     uv run stand.py --side right --part upright
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
@@ -693,6 +694,8 @@ class Stand:
         set_angles: list[float],
         tilt: float = TILT,
         flange_w: float = 0.0,
+        *,
+        pad_pockets: bool = False,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.outline = outline
@@ -701,6 +704,8 @@ class Stand:
         self.face_z = plate_t + post_h  # PCB seating plane over the back face
         self.attach = attach
         self.flange_w = flange_w
+        self.pad_pockets = pad_pockets  # cut the 4 corner pad pockets
+        # (off by default: plain flat underside)
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
@@ -1446,7 +1451,8 @@ class Stand:
         ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
-        base -= pad_pockets(self.pad_positions())
+        if self.pad_pockets:
+            base -= pad_pockets(self.pad_positions())
         base += joint_keys(self.band_mid)
         base -= joint_screw_bores(self.joint_screw_xs)
         base -= joint_screw_head_pockets(self.joint_screw_xs)
@@ -1744,6 +1750,12 @@ def main() -> None:
         "'padtest' = slicer-support coupons (pad pocket, head pocket)",
     )
     ap.add_argument(
+        '--pad-pockets',
+        action='store_true',
+        help='cut the 4 corner pad pockets into the base underside '
+        '(slicer-support experiment; default off = plain flat underside)',
+    )
+    ap.add_argument(
         '--tilt',
         type=str,
         default=f'{TILT:g}',
@@ -1835,9 +1847,18 @@ def main() -> None:
     # The base is tilt- and side-independent: one Stand, one export.
     if args.part == 'base':
         stands = [
-            Stand(pcb_w, pcb_h, holes, outline, args.post_h, args.attach, set_angles)
+            Stand(
+                pcb_w,
+                pcb_h,
+                holes,
+                outline,
+                args.post_h,
+                args.attach,
+                set_angles,
+                pad_pockets=args.pad_pockets,
+            )
         ]
-        stems = ['stand_base']
+        stems = ['stand_base' + ('_pads' if args.pad_pockets else '')]
     else:
         # 'fit' geometry does not vary with the tilt; only build it once.
         if args.part == 'fit':
@@ -1855,11 +1876,14 @@ def main() -> None:
                     set_angles,
                     tilt,
                     flange_w=args.flange,
+                    pad_pockets=args.pad_pockets,
                 )
             )
             tag = f'_t{tilt:g}'
             if args.flange:
                 tag += f'_flange{args.flange:g}'
+            if args.pad_pockets:
+                tag += '_pads'
             if args.part == 'upright':
                 stems.append(f'stand_{args.side}_upright{tag}')
             elif args.part == 'full':
