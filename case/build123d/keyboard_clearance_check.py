@@ -282,8 +282,10 @@ def main() -> None:
     print(f'   gap to base top {corn_w[2] - stand.base_t:.2f} mm; '
           f'x within boot span: {s.boot_lo <= corn_w[0] <= s.boot_hi}')
 
-    # ---- H3 self-tap screw capacity -----------------------------------------
-    print('\n== 4. H3 self-tap pilot: how long an M4 screw fits')
+    # ---- H3 self-tap screw capacity (informational only) --------------------
+    # The 3 nut-clamped screws hold the board in practice; this hole is
+    # rarely used, so the report just states what length fits — no gating.
+    print('\n== 4. H3 self-tap pilot: usable screw length (informational)')
     hx, hy = s.lowest_post
     free = face_z + args.pcb_t            # bore through PCB+post+plate
     x0, x1 = (s.band_mid - stand.key_x - stand.key_l / 2 - stand.joint_clear,
@@ -308,7 +310,7 @@ def main() -> None:
     for screw_len in (12, 14, 16):
         bite = screw_len - free   # tip depth into the toe plastic
         print(f'   M4x{screw_len}: tip bites {bite:.1f} mm into the toe '
-              'plastic' + (' (design value)' if screw_len == 12 else ''))
+              'plastic')
 
     if args.json:
         fig = {

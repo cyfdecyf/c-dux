@@ -315,8 +315,9 @@ def main() -> None:
     axins.axhline(0, color='k', lw=1.6)
     axins.axhspan(-8, 0, facecolor='0.96', hatch='///', edgecolor='0.55',
                   lw=0)
-    axins.axhline(6, color='0.35', lw=1.2, ls='--', zorder=2)
-    boxed(axins, cw[0] - 23, 6.4, '底座顶 z=6', '0.3')
+    base_t = figd['base']['t']
+    axins.axhline(base_t, color='0.35', lw=1.2, ls='--', zorder=2)
+    boxed(axins, cw[0] - 23, base_t + 0.4, f'底座顶 z={base_t:g}', '0.3')
     boot_f, ledge = figd['boot']['front'], figd['boot']['top']
     axins.plot([boot_f, boot_f + 8 * st / ct], [6, ledge], color='0.25',
                lw=2.2, zorder=2)
@@ -351,10 +352,11 @@ def main() -> None:
         arrowprops={'arrowstyle': '-|>', 'color': C_CORNER, 'lw': 1.0})
     boxed(axins, x0 + 12.5 * math.cos(aa), z0 + 12.5 * math.sin(aa) + 1.2,
           f'{a_edge:+.0f}°', C_CORNER, ha='center')
-    axins.annotate('', xy=(cw[0] + 5.5, 6), xytext=(cw[0] + 5.5, cw[2]),
+    axins.annotate('', xy=(cw[0] + 5.5, base_t),
+                   xytext=(cw[0] + 5.5, cw[2]),
                    arrowprops={'arrowstyle': '<->', 'color': 'k', 'lw': 1.0})
-    boxed(axins, cw[0] + 6.2, (6 + cw[2]) / 2,
-          f'距底座顶\n{cw[2] - 6:.1f} mm', 'k', va='center')
+    boxed(axins, cw[0] + 6.2, (base_t + cw[2]) / 2,
+          f'距底座顶\n{cw[2] - base_t:.1f} mm', 'k', va='center')
     axins.plot(hl_w[0], hl_w[2], 'o', color=C_HL, ms=5, zorder=6)
     axins.annotate(args.highlight_label.split('（')[0],
                    xy=(hl_w[0], hl_w[2]),

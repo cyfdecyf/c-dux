@@ -132,13 +132,13 @@ plate_margin = 10
 bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  v_floor keeps the board's lowest outline point clear of
 #                  the base top, and keyboard_drop eats most of that margin
-keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
-# much (user asked for "键盘下移 3cm"; the real-outline height floor auto-
-# caps the NET drop wherever it binds — the solver lifts the pattern just
-# enough to hold the 2 mm base-top margin; angle-dependent: t30/-35 lift
-# ~0.9 -> net 29.1, lowest point z = 8.00, while t30/-45 leaves lift = 0
-# (net 30, lowest point z ~ 9.8). The old 20 cap guarded the lowest post's
-# back-face nut pocket vs the boot top; lowest_post_tapped = True removes it)
+keyboard_drop = 33.0  # whole mounting pattern shifted DOWN the plate by this
+# much (initially a user-measured 30; raised to 33 so the slide-margin floor
+# actually BINDS at t30/-45 and squeezes the upright: the solver lifts the
+# pattern just enough to hold the floor, so the NET drop auto-caps —
+# t30/-45: lift ~0.11, net ~32.9, lowest point z ~ 7.30 (slide margin 1.5).
+# The old 20 cap guarded the lowest post's back-face nut pocket vs the boot
+# top; lowest_post_tapped = True removes it)
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
@@ -317,7 +317,8 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
 # default -40 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
-# board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
+# board's lowest outline point clears the base top by SLIDE_TOP_MARGIN
+# (measured along the plate plane), then
 # shifts the whole pattern keyboard_drop down the plate.
 SET_ANGLES = [-45]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
@@ -328,10 +329,13 @@ PLATE_HALF_BOUND = 72.0  # lateral layout sanity cap: the solver keeps post
 #                          base slab — the band IS the slab now) never
 #                          exceeds it either; a wider wish is a layout
 #                          problem, not a wider slab
-BASE_TOP_MARGIN = 2.0  # rotated board's lowest point vs base top — the ONLY
-#                        height constraint: clear the base, sit as low as
-#                        possible (the old 43 mm bottom-line rule applied only
-#                        to a base-parallel, unrotated mounting)
+SLIDE_TOP_MARGIN = 1.5  # keyboard slide margin vs base top, mm measured
+#                        ALONG the plate plane (world-z margin = this *
+#                        cos(tilt)): how far the mounted board could slide
+#                        down its posts before its lowest outline point
+#                        touches the base top — the ONLY height constraint
+#                        (the old world-z 2.0 rule applied to a vertical
+#                        drop the mounted board cannot make)
 EPS = 0.01
 MIN = Align.MIN
 
@@ -860,18 +864,21 @@ class Stand:
         lower on the plate (user request; with lowest_post_tapped the
         outline floor is the only limit — the solver lifts the pattern
         just enough to hold it, so the NET drop is keyboard_drop minus
-        that lift, ~29.1 mm at the default drop 30).
+        that lift, ~32.9 mm at the default drop 33).
         Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
         cv = sum(v for _, v in self.holes) / len(self.holes)
         rel = [(u - cu, v - cv) for u, v in self.holes]
         # v' the lowest board material may reach: the plate back face under
-        # it must stay BASE_TOP_MARGIN above the base top
+        # it must stay SLIDE_TOP_MARGIN above the base top, measured ALONG
+        # the plate plane (slide direction the mounted board can actually
+        # move in) — hence the *ct: world-z margin = slide * cos(tilt).
         # face_z = plate_t + post_h: the PCB back rides that far in front of
         # the plate back face, so its world height gains face_z * st
         v_floor = (
-            base_t + BASE_TOP_MARGIN - self.origin_z - self.face_z * self.st
+            base_t + SLIDE_TOP_MARGIN * self.ct - self.origin_z
+            - self.face_z * self.st
         ) / self.ct - bottom_ext
 
         lifted = []
@@ -1857,7 +1864,8 @@ def main() -> None:
             print(
                 f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
                 f'{max(x for x, _ in pts):7.2f}]  '
-                f'lowest PCB outline point z={corner_z:6.2f} mm'
+                f'lowest PCB outline point z={corner_z:6.2f} mm '
+                f'(slide margin {(corner_z - stand.origin_z) / stand.ct:.2f} mm)'
             )
         key_xs = [round(stand.band_mid + s * key_x, 1) for s in (-1, 1)]
         print(

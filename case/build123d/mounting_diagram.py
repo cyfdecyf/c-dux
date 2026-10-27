@@ -226,7 +226,7 @@ def main() -> None:
                   fontweight='bold', zorder=6)
     ax_b.text(0.03, 0.02,
               f'单组 4 柱位:图案绕自身质心旋转 {ang_:+g}°（home row 斜率），\n'
-              '求解器横向居中并守住 PCB 最低点距底座顶 ≥2 mm，\n'
+              '求解器横向居中并守住 PCB 最低点沿板面下滑余量 ≥1.5 mm，\n'
               f'整组再下移 {stand.keyboard_drop:g} mm；立板另后仰 '
               f'{s.tilt:g}°（此图未画）。\n'
               f'虚线 = Ø15 柱喇叭口，H3 为 Ø{stand.tap_d:g} 自攻底孔（免螺母）。',
