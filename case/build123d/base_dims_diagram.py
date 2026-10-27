@@ -56,14 +56,7 @@ def geometry() -> dict:
 
     tilt = math.radians(s.tilt)
     sn, ct = math.sin(tilt), math.cos(tilt)
-    # Ø20 TPU pads glue straight onto the flat underside (no pockets); the
-    # 2 mm edge inset is the recommended hand placement, as the pockets had it
-    pad_d, pad_e = 20, 2
-    px_lo = s.slab_lo + st.base_r + pad_e
-    px_hi = s.slab_hi - st.base_r - pad_e
-    fy = s.y0 + st.base_r + pad_e
-    ry = s.y1 - st.base_r - pad_e
-    pads = [(px_lo, fy), (px_hi, fy), (0, fy), (px_lo, ry), (px_hi, ry), (0, ry)]
+    pads = s.pad_positions()  # 4 corner pockets, slicer-supported ceilings
     kb_t0 = POST_H + 1.5   # PCB face offset from the plate (posts + board)
     kb_t1 = kb_t0 + 8.5    # + keycap stack
 
@@ -79,7 +72,7 @@ def geometry() -> dict:
     return {
         'bx': s.bx, 'bx_lo': s.band_lo, 'bx_hi': s.band_hi,
         'y_front': s.y0, 'y_rear': s.y1,
-        'pads': pads, 'pad_d': pad_d,
+        'pads': pads, 'pad_d': st.pad_d,
         'pad_f': min(y for _, y in pads), 'pad_r': max(y for _, y in pads),
         'key_x': st.key_x, 'key_l': st.key_l,
         'key_xs': [s.band_mid + sx * st.key_x for sx in (-1, 1)],

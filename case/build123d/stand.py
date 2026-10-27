@@ -67,6 +67,7 @@ Usage:
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
     uv run stand.py --part full              # fused assembly preview
     uv run stand.py --part joint             # small fit-test coupons
+    uv run stand.py --part padtest           # slicer-support test coupons
     uv run stand.py --part fit               # legacy flat validation plate
     uv run stand.py --set-angles 20          # in-plane angle of the one set
     uv run stand.py --part base --step       # also export STEP for outsourcing
@@ -204,13 +205,27 @@ rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
 #            from vertical, self-supporting
 rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
 #            tip printed fragile and carries no load up there anyway
-# The base underside is a plain flat face: the Ø20 two-level pad pockets kept
-# failing in print (recess-ceiling droop / strands fouling the glue face), so
-# they are gone. The 1 mm self-adhesive TPU pads now glue straight onto the
-# flat floor, placed by hand hugging the slab edges as before — the pad faces
-# sit pad_t proud of the desk, so the pads stay the ONLY desk contact (the
-# tip-over pivots), and every mm of outward placement is a mm of tip lever.
-pad_t = 1.0  # purchased self-adhesive TPU pad thickness (glued on flat)
+# Pad pockets are back at the corners, as a slicer-support experiment: the
+# Ø20 two-level no-support pockets kept failing in print (recess-ceiling
+# droop / strands fouling the glue face), so the retry is a plain
+# straight-wall Ø20.2 × 0.6 pocket with NO steps — the recess ceiling rides
+# on slicer support, expected to also clean up the Ø7.6 head-pocket shoulder.
+# Print --part padtest first to dial in the support settings. The 1 mm
+# self-adhesive TPU pads glue into the flat-bottom pocket; their faces sit
+# pad_t - pad_recess = 0.4 above the desk, so the pads stay the ONLY desk
+# contact (the tip-over pivots) across die-cut thickness tolerance, and
+# every mm of outward placement is a mm of tip lever.
+pad_d = 20
+pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
+#                separate from the joint_clear key fit below)
+pad_t = 1.0  # purchased self-adhesive TPU pad thickness
+pad_protrude = 0.4  # pad face above the desk face
+pad_recess = pad_t - pad_protrude  # 0.6 pocket depth, plain flat bottom
+pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
+#              as this allows — the tip-over pivots are the PAD contact lines,
+#              so every mm outward is a mm of tip lever (2 mm still keeps the
+#              0.6 mm pocket fully on the flat, clear of the base corner
+#              fillets)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 #                              slab's flat top, inside the 2 mm perimeter
@@ -435,12 +450,12 @@ def joint_keys(band_mid: float):
     return chamfer(keys.edges().group_by(Axis.Z)[-1], key_chamfer)
 
 
-def joint_screw_bores(xs: list[float]):
+def joint_screw_bores(xs: list[float], y: float = joint_screw_y):
     """Vertical M4 clearance holes through the base (pair with
     joint_screw_head_pockets on the underside)."""
     bores = None
     for x in xs:
-        bore = Pos(x, joint_screw_y, -EPS) * Cylinder(
+        bore = Pos(x, y, -EPS) * Cylinder(
             joint_screw_d / 2,
             base_t + 2 * EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -449,7 +464,7 @@ def joint_screw_bores(xs: list[float]):
     return bores
 
 
-def joint_screw_head_pockets(xs: list[float]):
+def joint_screw_head_pockets(xs: list[float], y: float = joint_screw_y):
     """Socket-head pockets open at the base underside: the heads must sit
     below the desk face or the base would rock on them, and the driver
     works from the open bottom anyway.
@@ -462,7 +477,7 @@ def joint_screw_head_pockets(xs: list[float]):
     matter — see the README print tips."""
     pockets = None
     for x in xs:
-        pocket = Pos(x, joint_screw_y, -EPS) * Cylinder(
+        pocket = Pos(x, y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -519,6 +534,43 @@ def joint_grooves(band_mid: float):
         )
         grooves = groove if grooves is None else grooves + groove
     return grooves
+
+
+def pad_pockets(positions: list[tuple[float, float]]):
+    """Straight-wall Ø(pad_d + 2*pad_fit) x pad_recess pockets open at the
+    base underside, flat bottoms, NO steps: the recess ceiling rides on
+    slicer support (the old two-level no-support pocket kept failing — see
+    the pad_* notes). Shared by the base and the pad coupon so the coupon
+    tests the exact production feature."""
+    pockets = None
+    for px, py in positions:
+        pocket = Pos(px, py, -EPS) * Cylinder(
+            pad_d / 2 + pad_fit,
+            pad_recess + EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        pockets = pocket if pockets is None else pockets + pocket
+    return pockets
+
+
+def pad_coupon():
+    """Slicer-support test coupon for the pad pocket: production-geometry
+    pocket in a minimal round puck (2 mm wall, like the base edge margin),
+    printed in the base's attitude (pocket open to the bed). Only 2 mm
+    thick — the ceiling sits just 0.6 mm up, and material above it adds
+    nothing to the support question (unlike the head pocket, whose 4.2 mm
+    pocket needs the full base_t)."""
+    c = Cylinder(pad_d / 2 + pad_fit + 2, 2,
+                 align=(Align.CENTER, Align.CENTER, MIN))
+    return c - pad_pockets([(0, 0)])
+
+
+def head_coupon():
+    """Slicer-support test coupon for the head-pocket shoulder: production-
+    geometry Ø7.6 pocket + Ø4.5 through bore in a minimal round puck
+    (2 mm wall), same attitude as the base underside."""
+    c = Pos(0, 0, base_t / 2) * Cylinder(head_pocket_d / 2 + 2, base_t)
+    return c - joint_screw_head_pockets([0], y=0) - joint_screw_bores([0], y=0)
 
 
 def _coupon_box(stand: Stand, z0: float, height: float):
@@ -1013,6 +1065,19 @@ class Stand:
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(2.0, min(haunch_h, h))
 
+    # -- keyboard-plate frame helpers -----------------------------------------
+
+    def pad_positions(self) -> list[tuple[float, float]]:
+        """Four corners, one pad each (the old 6-pad layout's mid rows are
+        gone). Per-side x: the slab IS the raw (asymmetric) post-need
+        footprint, so each pad hugs ITS slab edge — unaffected by the band
+        clamp (the base does not change when the plate band is trimmed)."""
+        px_lo = self.slab_lo + base_r + pad_edge
+        px_hi = self.slab_hi - base_r - pad_edge
+        fy = self.y0 + base_r + pad_edge
+        ry = self.y1 - base_r - pad_edge
+        return [(px_lo, fy), (px_hi, fy), (px_lo, ry), (px_hi, ry)]
+
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
     def _top_corner_cuts(self):
@@ -1364,8 +1429,7 @@ class Stand:
         ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
-        # no pad pockets — the underside stays flat (pockets kept failing in
-        # print); the TPU pads glue straight onto it at assembly
+        base -= pad_pockets(self.pad_positions())
         base += joint_keys(self.band_mid)
         base -= joint_screw_bores(self.joint_screw_xs)
         base -= joint_screw_head_pockets(self.joint_screw_xs)
@@ -1654,12 +1718,13 @@ def main() -> None:
     ap.add_argument('--side', choices=['left', 'right'], default='left')
     ap.add_argument(
         '--part',
-        choices=['base', 'upright', 'full', 'fit', 'joint'],
+        choices=['base', 'upright', 'full', 'fit', 'joint', 'padtest'],
         default='full',
         help="'base' = base slab (follows the band footprint) | "
         "'upright' = per-tilt part | "
         "'full' = fused preview | 'fit' = flat validation plate | "
-        "'joint' = fit-test coupons",
+        "'joint' = fit-test coupons | "
+        "'padtest' = slicer-support coupons (pad pocket, head pocket)",
     )
     ap.add_argument(
         '--tilt',
@@ -1734,6 +1799,12 @@ def main() -> None:
             step = args.out / f'{stem}.step'
             export_step(part, step)
             print(f'          {step}')
+
+    if args.part == 'padtest':
+        # production-geometry support coupons, no Stand layout needed
+        emit(pad_coupon(), 'pad_coupon')
+        emit(head_coupon(), 'head_coupon')
+        return
 
     if args.part == 'joint':
         # the coupons reuse the exact production features, so they need the

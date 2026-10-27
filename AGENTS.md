@@ -32,6 +32,7 @@ uv sync                         # 首次；按 uv.lock 建 .venv（build123d 0.1
 uv run stand.py --part base     # 共享底座（打印一次，不分左右）
 uv run stand.py --part upright  # 左立板，默认 30° 后仰（set-angles −45）；--side right 出右立板
 uv run stand.py --part joint    # 配合试块（下整件订单前先打这个验证公差）
+uv run stand.py --part padtest  # 支撑试块（胶垫孔+沉头孔，调切片支撑参数）
 uv run stand.py --part upright --tilt 10,15,20,25,30 --step   # 批量角度 + STEP
 uv run stand.py --show          # 只推送 OCP CAD Viewer 预览，不导出文件
 ```
