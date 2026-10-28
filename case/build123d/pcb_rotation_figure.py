@@ -17,7 +17,7 @@ Usage:
     uv run --with matplotlib --with trimesh --with shapely python \
         pcb_rotation_figure.py \
         --data out/keyboard_clearance.json \
-        --stand-stl out/stand_left_full_t30.stl
+        --stand-stl out/stand_right_full_t30_a-53.stl
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
                     help='JSON from keyboard_clearance_check.py --json')
     ap.add_argument('--stand-stl', default=None,
                     help='fused assembly STL (stand.py --part full); '
-                    'default out/stand_left_full_t<tilt>.stl')
+                    'default out/stand_right_full_t<tilt>_a<angle>.stl')
     ap.add_argument('--out', default='out/pcb_rotation_compare.png')
     ap.add_argument('--highlight-key', default='ring_TOP',
                     help='switch name (key of the JSON "keys" map) to mark')
@@ -78,7 +78,10 @@ def main() -> None:
     cu = sum(p[0] for p in holes.values()) / len(holes)
     cv = sum(p[1] for p in holes.values()) / len(holes)
     r = math.radians(ang)
-    stl = args.stand_stl or f'out/stand_left_full_t{figd["tilt"]:g}.stl'
+    stl = (
+        args.stand_stl
+        or f'out/stand_right_full_t{figd["tilt"]:g}_a{figd["set_angle"]:g}.stl'
+    )
 
     def to_plate_uv(u: float, v: float) -> tuple[float, float]:
         ru = cu + (u - cu) * math.cos(r) - (v - cv) * math.sin(r)
@@ -315,8 +318,9 @@ def main() -> None:
     axins.axhline(0, color='k', lw=1.6)
     axins.axhspan(-8, 0, facecolor='0.96', hatch='///', edgecolor='0.55',
                   lw=0)
-    axins.axhline(6, color='0.35', lw=1.2, ls='--', zorder=2)
-    boxed(axins, cw[0] - 23, 6.4, '底座顶 z=6', '0.3')
+    base_t = figd['base']['t']
+    axins.axhline(base_t, color='0.35', lw=1.2, ls='--', zorder=2)
+    boxed(axins, cw[0] - 23, base_t + 0.4, f'底座顶 z={base_t:g}', '0.3')
     boot_f, ledge = figd['boot']['front'], figd['boot']['top']
     axins.plot([boot_f, boot_f + 8 * st / ct], [6, ledge], color='0.25',
                lw=2.2, zorder=2)
@@ -351,10 +355,11 @@ def main() -> None:
         arrowprops={'arrowstyle': '-|>', 'color': C_CORNER, 'lw': 1.0})
     boxed(axins, x0 + 12.5 * math.cos(aa), z0 + 12.5 * math.sin(aa) + 1.2,
           f'{a_edge:+.0f}°', C_CORNER, ha='center')
-    axins.annotate('', xy=(cw[0] + 5.5, 6), xytext=(cw[0] + 5.5, cw[2]),
+    axins.annotate('', xy=(cw[0] + 5.5, base_t),
+                   xytext=(cw[0] + 5.5, cw[2]),
                    arrowprops={'arrowstyle': '<->', 'color': 'k', 'lw': 1.0})
-    boxed(axins, cw[0] + 6.2, (6 + cw[2]) / 2,
-          f'距底座顶\n{cw[2] - 6:.1f} mm', 'k', va='center')
+    boxed(axins, cw[0] + 6.2, (base_t + cw[2]) / 2,
+          f'距底座顶\n{cw[2] - base_t:.1f} mm', 'k', va='center')
     axins.plot(hl_w[0], hl_w[2], 'o', color=C_HL, ms=5, zorder=6)
     axins.annotate(args.highlight_label.split('（')[0],
                    xy=(hl_w[0], hl_w[2]),

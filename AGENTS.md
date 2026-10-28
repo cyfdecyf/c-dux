@@ -30,8 +30,9 @@ cd ergogen && ergogen .    # 也是 VS Code 默认构建任务（.vscode/tasks.j
 cd case/build123d
 uv sync                         # 首次；按 uv.lock 建 .venv（build123d 0.11.1）
 uv run stand.py --part base     # 共享底座（打印一次，不分左右）
-uv run stand.py --part upright  # 左立板，默认 30° 后仰（set-angles −45）；--side right 出右立板
+uv run stand.py --side right --part upright  # 右立板（未镜像体），默认 30° 后仰（set-angles −53）；默认 --side left 出左立板
 uv run stand.py --part joint    # 配合试块（下整件订单前先打这个验证公差）
+uv run stand.py --part padtest  # 支撑试块（胶垫孔+沉头孔，调切片支撑参数）
 uv run stand.py --part upright --tilt 10,15,20,25,30 --step   # 批量角度 + STEP
 uv run stand.py --show          # 只推送 OCP CAD Viewer 预览，不导出文件
 ```
@@ -53,8 +54,8 @@ uv run stand.py --part base --step && uv run stand.py --part upright --step && u
 uv run keyboard_clearance_check.py --json out/keyboard_clearance.json
                                                   # ③ 键盘 vs 底座/靴座干涉+间隙（须全 0）
 uv run --with trimesh --with shapely --with numpy --with networkx --with rtree \
-  python layer_float_audit.py out/stand_left_upright_t30.stl
-uv run --with numpy python overhang_report.py out/stand_left_upright_t30.stl
+  python layer_float_audit.py out/stand_right_upright_t30_a-53.stl
+uv run --with numpy python overhang_report.py out/stand_right_upright_t30_a-53.stl
                                                   # ④ 打印性审计（悬空/孤岛、下行面），基线见 docs/stand-design.md §9
 uv run --with matplotlib --with trimesh --with shapely python \
   pcb_rotation_figure.py --data out/keyboard_clearance.json --stand-stl out/stand_left_full_t30.stl
@@ -66,9 +67,9 @@ uv run check_pcb_alignment.py                     # gerber 钻孔 ↔ KiCad 封�
 | 脚本 | 功能 |
 |---|---|
 | `key_layout_check.py` | 给定 `--set-angles`/`--tilt`，不建实体快速列出安装后各键世界高度与最低键——选旋转方向、确认键位布局用 |
-| `keyboard_clearance_check.py` | 键盘（PCB 实体 + 轴体 + 键帽/热插拔座保守代理，尺寸可用参数调）对底座/立板/靴座做布尔干涉检查与间隙量化，输出最低板料点、角点朝向数据；`--json` 导出绘图数据 |
+| `keyboard_clearance_check.py` | 键盘（PCB 实体 + 轴体 + 键帽/热插拔座保守代理，尺寸可用参数调）对底座/立板/靴座做布尔干涉检查与间隙量化，输出最低板料点、角点朝向、H3 自攻容螺长数据；`--json` 导出绘图数据 |
 | `pcb_rotation_figure.py` | PCB 旋转前后对比图：平放/安装的正视 + 侧视，每格画水平面，标键位、最高亮键与角点朝向；输入 = clearance 脚本的 JSON + `stand.py --part full` 的装配 STL |
-| `mounting_diagram.py` | 重新生成 README 的 mounting.png 安装朝向示意图：左 PCB 站立系平放（孔位/部件/朝向），右装上立板的板局部系（真实板框截面 + 柱位，H3 自攻标注） |
+| `mounting_diagram.py` | 重新生成 README 的 images/mounting.png 安装朝向示意图：左 PCB 站立系平放（孔位/部件/朝向），右装上立板的板局部系（真实板框截面 + 柱位，H3 自攻标注） |
 | `check_pcb_alignment.py` | PCB 改版防呆：gerber PTH 钻孔 ↔ KiCad 封装坐标 ↔ `parse_pcb`/`HOLES_EXPECTED` ↔ 立板柱位四方核对（刚性映射、无镜像） |
 | `layer_float_audit.py` / `overhang_report.py` | 打印性审计：0.2 mm 逐层悬空/孤岛、下行面坡度分桶；依赖用 `uv run --with …` 临时装入（见上） |
 | `base_dims_diagram.py` | 由 stand.py 常量自动生成底座 front/rear/进深示意图（README 引用） |
@@ -110,7 +111,7 @@ cd case/build123d && ruff check stand.py    # 配置在 ruff.toml（行宽 90、
 
 ### 底座几何
 
-两件式结构：共享底座（对称、不分左右、只打印一次）+ 按后仰角的立板（背板 + 4 柱 + 靴座），榫键 + 2×M4 从底面拧接，换后仰角只重打立板。
+两件式结构：共享底座（对称、不分左右、只打印一次）+ 按后仰角的立板（背板 + 4 柱 + 靴座），榫键 + 2×M4 从底面拧接，换后仰角只重打立板。未镜像体为右手（随机选的并无偏好），换手时镜像立板沿 x 平移 2×band_mid（10 mm）装同一底座；立板文件名 `stand_<side>_upright_t<后仰角>_a<安装角>.stl`。
 背板上 1 组 M4 柱位（平面内旋转默认 −40°，`--set-angles` 可改）决定 home row 倾斜；
 柱位由求解器自动排布（横向居中、旋转后板角距底座顶面 ≥2 mm），背板高度按覆盖最高螺丝孔离桌面的垂直投影加余量（`top_rim`）取值，轮廓在肋带以上自动收腰为柱位包络凸包（PCB 悬在柱前端、不接触板面），加强肋位置亦自动避让柱位。
 几何参数是 `stand.py` 顶部的模块常量。

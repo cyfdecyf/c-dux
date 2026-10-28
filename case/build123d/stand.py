@@ -38,7 +38,7 @@ Highlights over the retired OpenSCAD version:
     posts carry the same flare. The haunch toe now wraps the pilot's
     rear exit, giving the screw tip ~1 mm of extra plastic bite.
   * Single mounting set, minimal upright: one 4-post pattern (--set-angles,
-    default -45 deg in-plane rotation = home-row slope), and the backplate
+    default -53 deg in-plane rotation = home-row slope), and the backplate
     only rises to just above the topmost screw hole's vertical projection
     (plus a rim) — the PCB above the top posts cantilevers on them. Above
     the rib band the outline tapers in to just envelope the post columns;
@@ -52,21 +52,31 @@ flipped vs the KiCad view per the mounting orientation above:
     u = Y_max - Y_kicad          (horizontal)
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
+Handedness: the unmirrored layout happens to be the RIGHT-hand upright,
+picked at random, no deeper reason. --side left mirrors the upright; the
+BASE is hand-universal: every engagement feature (key bar, joint screws,
+boot flat) is symmetric about the band mid, so the mirrored upright
+re-seats on the very same slab shifted 2*band_mid sideways (the 'full'
+preview shows exactly that mounting).
+
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
-centroid by --set-angles (default -45 deg CCW in the front view; negate to
+centroid by --set-angles (default -53 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
 it so the rotated board's lowest outline point (real Edge.Cuts material —
-the bbox corner holds no board) clears the base top by 2 mm, then shifts
-the whole pattern keyboard_drop down the plate (user-measured).
+the bbox corner holds no board) clears the base top by SLIDE_TOP_MARGIN
+(1.5 mm along the plate plane), then shifts the whole pattern
+keyboard_drop down the plate (user-measured).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
-    uv run stand.py --part base              # shared base slab (print once)
-    uv run stand.py --part upright           # left upright, 30 deg recline
-    uv run stand.py --side right --part upright
+    uv run stand.py --part base              # base slab, serves BOTH hands
+    uv run stand.py --part base --pad-pockets  # ... with 6 pad pockets
+    uv run stand.py --side right --part upright  # right upright (unmirrored)
+    uv run stand.py --part upright           # left upright = mirrored right
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
     uv run stand.py --part full              # fused assembly preview
     uv run stand.py --part joint             # small fit-test coupons
+    uv run stand.py --part padtest           # slicer-support test coupons
     uv run stand.py --part fit               # legacy flat validation plate
     uv run stand.py --set-angles 20          # in-plane angle of the one set
     uv run stand.py --part base --step       # also export STEP for outsourcing
@@ -131,13 +141,14 @@ plate_margin = 10
 bottom_ext = 6.5  # nominal plate below the PCB bottom edge; the solver's
 #                  v_floor keeps the board's lowest outline point clear of
 #                  the base top, and keyboard_drop eats most of that margin
-keyboard_drop = 30.0  # whole mounting pattern shifted DOWN the plate by this
-# much (user asked for "键盘下移 3cm"; the real-outline height floor auto-
-# caps the NET drop wherever it binds — the solver lifts the pattern just
-# enough to hold the 2 mm base-top margin; angle-dependent: t30/-35 lift
-# ~0.9 -> net 29.1, lowest point z = 8.00, while t30/-45 leaves lift = 0
-# (net 30, lowest point z ~ 9.8). The old 20 cap guarded the lowest post's
-# back-face nut pocket vs the boot top; lowest_post_tapped = True removes it)
+keyboard_drop = 35.5  # whole mounting pattern shifted DOWN the plate by this
+# much (user-measured 30, then 33 at t30/-45; re-raised to 35.5 for t30/-53
+# so the slide-margin floor BINDS again and the keyboard sits as low as the
+# 1.5 mm slide margin allows: the solver lifts the pattern just enough to
+# hold the floor, so the NET drop auto-caps —
+# t30/-53: lift ~0.00, net ~35.5, lowest point z ~ 7.3 (slide margin 1.5).
+# The old 20 cap guarded the lowest post's back-face nut pocket vs the boot
+# top; lowest_post_tapped = True removes it)
 lowest_post_tapped = True  # lowest post gets a Ø tap_d self-tapping pilot
 # instead of a nut pocket: after the drop its back-face pocket would sit
 # inside the boot's z-band with no insertion access, and a tapped hole needs
@@ -166,8 +177,9 @@ nut_pocket_depth = nut_h  # PCB nut pocket depth into the plate; leaves
 #                          Ø10 post directly buttresses — the nut bears on
 #                          that wall (clamp load: nut -> wall -> post)
 screw_d = 4.5
-tap_d = 3.8  # Ø self-tapping pilot for the lowest post (M4 screws
-#             straight in; user-sized up from the 3.4 first draft)
+tap_d = 4.0  # Ø self-tapping pilot for the lowest post (M4 screws
+#             straight in; user-sized up 3.4 -> 3.8 -> 4.0: PETG shrink
+#             plus vertical-print sag made 3.8 too tight to start)
 base_t = 6  # the seat plane: base top = upright's boot bottom. 8 was sized
 #            for walls around the (since deleted) coin slots; 6 is plenty
 #            for a flat slab and drops the keyboard 2 mm
@@ -203,13 +215,27 @@ rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
 #            from vertical, self-supporting
 rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
 #            tip printed fragile and carries no load up there anyway
-# The base underside is a plain flat face: the Ø20 two-level pad pockets kept
-# failing in print (recess-ceiling droop / strands fouling the glue face), so
-# they are gone. The 1 mm self-adhesive TPU pads now glue straight onto the
-# flat floor, placed by hand hugging the slab edges as before — the pad faces
-# sit pad_t proud of the desk, so the pads stay the ONLY desk contact (the
-# tip-over pivots), and every mm of outward placement is a mm of tip lever.
-pad_t = 1.0  # purchased self-adhesive TPU pad thickness (glued on flat)
+# Pad pockets are back, as a slicer-support experiment: the
+# Ø20 two-level no-support pockets kept failing in print (recess-ceiling
+# droop / strands fouling the glue face), so the retry is a plain
+# straight-wall Ø20.2 × 0.6 pocket with NO steps — the recess ceiling rides
+# on slicer support, expected to also clean up the Ø7.6 head-pocket shoulder.
+# Print --part padtest first to dial in the support settings. The 1 mm
+# self-adhesive TPU pads glue into the flat-bottom pocket; their faces sit
+# pad_t - pad_recess = 0.4 above the desk, so the pads stay the ONLY desk
+# contact (the tip-over pivots) across die-cut thickness tolerance, and
+# every mm of outward placement is a mm of tip lever.
+pad_d = 20
+pad_fit = 0.1  # radial install clearance at the pocket mouth (0.2 on dia;
+#                separate from the joint_clear key fit below)
+pad_t = 1.0  # purchased self-adhesive TPU pad thickness
+pad_protrude = 0.4  # pad face above the desk face
+pad_recess = pad_t - pad_protrude  # 0.6 pocket depth, plain flat bottom
+pad_edge = 2  # pad circle edge to the slab straight edge; pads sit as far out
+#              as this allows — the tip-over pivots are the PAD contact lines,
+#              so every mm outward is a mm of tip lever (2 mm still keeps the
+#              0.6 mm pocket fully on the flat, clear of the base corner
+#              fillets)
 base_top_fillet = 2  # B-rep extra: round-over on the base top perimeter
 boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 #                              slab's flat top, inside the 2 mm perimeter
@@ -229,7 +255,7 @@ boot_inset = base_top_fillet  # boot setback per side: sit fully on the base
 # driver under the reclined plate. The seat plane carries compression, the
 # keys carry shear and location, the screws carry lift and clamp.
 TILT = 30.0  # stand recline from vertical, deg — per-upright (--tilt);
-#             current working default: 30 deg with SET_ANGLES [-45]
+#             current working default: 30 deg with SET_ANGLES [-53]
 joint_clear = 0.2  # key/groove clearance per face: snug FDM slide fit
 #                    (halved from the old 0.4 baseline — less slop on the
 #                    merged key bar; print a --part joint coupon FIRST to
@@ -299,11 +325,12 @@ nut_pocket_ac = 8.6  # hex pocket across corners + clearance (rib keep-out);
 
 # --- rotation set ---------------------------------------------------------------
 # A single 4-post set per upright; its in-plane rotation (--set-angles,
-# default -40 deg CCW in the front view, negate to mirror) sets the home-row
+# default -53 deg CCW in the front view, negate to mirror) sets the home-row
 # slope. The solver centers the set laterally and lifts it so the rotated
-# board's lowest outline point clears the base top (BASE_TOP_MARGIN), then
+# board's lowest outline point clears the base top by SLIDE_TOP_MARGIN
+# (measured along the plate plane), then
 # shifts the whole pattern keyboard_drop down the plate.
-SET_ANGLES = [-45]  # deg, CCW in front view (negate to mirror tilt)
+SET_ANGLES = [-53]  # deg, CCW in front view (negate to mirror tilt)
 MIN_POST_CENTER = 11.0  # post diameter 10 + 1 mm printing clearance
 SHIFT_GRID = 3.0  # lateral shift candidates per set, packed by brute force
 SHIFT_SPAN = 45.0  # max |lateral shift| of a set centroid
@@ -312,10 +339,13 @@ PLATE_HALF_BOUND = 72.0  # lateral layout sanity cap: the solver keeps post
 #                          base slab — the band IS the slab now) never
 #                          exceeds it either; a wider wish is a layout
 #                          problem, not a wider slab
-BASE_TOP_MARGIN = 2.0  # rotated board's lowest point vs base top — the ONLY
-#                        height constraint: clear the base, sit as low as
-#                        possible (the old 43 mm bottom-line rule applied only
-#                        to a base-parallel, unrotated mounting)
+SLIDE_TOP_MARGIN = 1.5  # keyboard slide margin vs base top, mm measured
+#                        ALONG the plate plane (world-z margin = this *
+#                        cos(tilt)): how far the mounted board could slide
+#                        down its posts before its lowest outline point
+#                        touches the base top — the ONLY height constraint
+#                        (the old world-z 2.0 rule applied to a vertical
+#                        drop the mounted board cannot make)
 EPS = 0.01
 MIN = Align.MIN
 
@@ -434,12 +464,12 @@ def joint_keys(band_mid: float):
     return chamfer(keys.edges().group_by(Axis.Z)[-1], key_chamfer)
 
 
-def joint_screw_bores(xs: list[float]):
+def joint_screw_bores(xs: list[float], y: float = joint_screw_y):
     """Vertical M4 clearance holes through the base (pair with
     joint_screw_head_pockets on the underside)."""
     bores = None
     for x in xs:
-        bore = Pos(x, joint_screw_y, -EPS) * Cylinder(
+        bore = Pos(x, y, -EPS) * Cylinder(
             joint_screw_d / 2,
             base_t + 2 * EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -448,7 +478,7 @@ def joint_screw_bores(xs: list[float]):
     return bores
 
 
-def joint_screw_head_pockets(xs: list[float]):
+def joint_screw_head_pockets(xs: list[float], y: float = joint_screw_y):
     """Socket-head pockets open at the base underside: the heads must sit
     below the desk face or the base would rock on them, and the driver
     works from the open bottom anyway.
@@ -461,7 +491,7 @@ def joint_screw_head_pockets(xs: list[float]):
     matter — see the README print tips."""
     pockets = None
     for x in xs:
-        pocket = Pos(x, joint_screw_y, -EPS) * Cylinder(
+        pocket = Pos(x, y, -EPS) * Cylinder(
             head_pocket_d / 2,
             head_pocket_h + EPS,
             align=(Align.CENTER, Align.CENTER, MIN),
@@ -518,6 +548,43 @@ def joint_grooves(band_mid: float):
         )
         grooves = groove if grooves is None else grooves + groove
     return grooves
+
+
+def pad_pockets(positions: list[tuple[float, float]]):
+    """Straight-wall Ø(pad_d + 2*pad_fit) x pad_recess pockets open at the
+    base underside, flat bottoms, NO steps: the recess ceiling rides on
+    slicer support (the old two-level no-support pocket kept failing — see
+    the pad_* notes). Shared by the base and the pad coupon so the coupon
+    tests the exact production feature."""
+    pockets = None
+    for px, py in positions:
+        pocket = Pos(px, py, -EPS) * Cylinder(
+            pad_d / 2 + pad_fit,
+            pad_recess + EPS,
+            align=(Align.CENTER, Align.CENTER, MIN),
+        )
+        pockets = pocket if pockets is None else pockets + pocket
+    return pockets
+
+
+def pad_coupon():
+    """Slicer-support test coupon for the pad pocket: production-geometry
+    pocket in a minimal round puck (2 mm wall, like the base edge margin),
+    printed in the base's attitude (pocket open to the bed). Only 2 mm
+    thick — the ceiling sits just 0.6 mm up, and material above it adds
+    nothing to the support question (unlike the head pocket, whose 4.2 mm
+    pocket needs the full base_t)."""
+    c = Cylinder(pad_d / 2 + pad_fit + 2, 2,
+                 align=(Align.CENTER, Align.CENTER, MIN))
+    return c - pad_pockets([(0, 0)])
+
+
+def head_coupon():
+    """Slicer-support test coupon for the head-pocket shoulder: production-
+    geometry Ø7.6 pocket + Ø4.5 through bore in a minimal round puck
+    (2 mm wall), same attitude as the base underside."""
+    c = Pos(0, 0, base_t / 2) * Cylinder(head_pocket_d / 2 + 2, base_t)
+    return c - joint_screw_head_pockets([0], y=0) - joint_screw_bores([0], y=0)
 
 
 def _coupon_box(stand: Stand, z0: float, height: float):
@@ -634,6 +701,8 @@ class Stand:
         set_angles: list[float],
         tilt: float = TILT,
         flange_w: float = 0.0,
+        *,
+        pad_pockets: bool = False,
     ):
         self.pcb_w, self.pcb_h, self.holes = pcb_w, pcb_h, holes
         self.outline = outline
@@ -642,6 +711,8 @@ class Stand:
         self.face_z = plate_t + post_h  # PCB seating plane over the back face
         self.attach = attach
         self.flange_w = flange_w
+        self.pad_pockets = pad_pockets  # cut the 6 pad pockets
+        # (off by default: plain flat underside)
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
         #                         foot + keys + joint screws carry the junction
@@ -807,18 +878,21 @@ class Stand:
         lower on the plate (user request; with lowest_post_tapped the
         outline floor is the only limit — the solver lifts the pattern
         just enough to hold it, so the NET drop is keyboard_drop minus
-        that lift, ~29.1 mm at the default drop 30).
+        that lift, ~35.5 mm at the default drop 35.5).
         Optimizes for the largest minimum post distance, tie-broken by
         a compact span and a centered shift."""
         cu = sum(u for u, _ in self.holes) / len(self.holes)
         cv = sum(v for _, v in self.holes) / len(self.holes)
         rel = [(u - cu, v - cv) for u, v in self.holes]
         # v' the lowest board material may reach: the plate back face under
-        # it must stay BASE_TOP_MARGIN above the base top
+        # it must stay SLIDE_TOP_MARGIN above the base top, measured ALONG
+        # the plate plane (slide direction the mounted board can actually
+        # move in) — hence the *ct: world-z margin = slide * cos(tilt).
         # face_z = plate_t + post_h: the PCB back rides that far in front of
         # the plate back face, so its world height gains face_z * st
         v_floor = (
-            base_t + BASE_TOP_MARGIN - self.origin_z - self.face_z * self.st
+            base_t + SLIDE_TOP_MARGIN * self.ct - self.origin_z
+            - self.face_z * self.st
         ) / self.ct - bottom_ext
 
         lifted = []
@@ -951,9 +1025,17 @@ class Stand:
                 continue
             # cap: wedge apex stays 2 mm below any pocket mouth overlapping
             # the stub's x-span (mouth bottom z = ct·(y − ac/2) on the back
-            # face; wedge apex z = ct·h + e·st above the seat)
+            # face; wedge apex z = ct·h + e·st above the seat). Posts at or
+            # below the boot top (back-face height 8/ct above the seat) are
+            # skipped: the wedge is submerged inside the boot there, so it
+            # cannot block their hardware (t30/−53: H3 y 6.8 sits inside the
+            # boot band — treating it like a pocket post produced a bogus
+            # −0.7 cap that killed this rib; the tapped lowest post has no
+            # pocket and needs no rear access anyway).
             h = rib_h
             for px, py in self.all_posts:
+                if py <= 8.0 / self.ct:
+                    continue
                 if abs(px - x_stub) < rib_t / 2 + nut_pocket_ac / 2:
                     h = min(
                         h,
@@ -1011,6 +1093,25 @@ class Stand:
         y_top = min_y - 6.5
         h = (self.origin_z + y_top * self.ct - base_t + 1) / self.ct
         return max(2.0, min(haunch_h, h))
+
+    # -- keyboard-plate frame helpers -----------------------------------------
+
+    def pad_positions(self) -> list[tuple[float, float]]:
+        """Six pads: the 4 corners plus one mid front/rear each (the old
+        6-pad layout). Per-side x: the slab IS the raw (asymmetric)
+        post-need footprint, so the outer pads hug THEIR slab edge —
+        unaffected by the band clamp (the base does not change when the
+        plate band is trimmed); the mid pads sit on the slab mid (= the
+        band mid, the base is asymmetric)."""
+        px_lo = self.slab_lo + base_r + pad_edge
+        px_hi = self.slab_hi - base_r - pad_edge
+        mx = (self.slab_lo + self.slab_hi) / 2
+        fy = self.y0 + base_r + pad_edge
+        ry = self.y1 - base_r - pad_edge
+        return [
+            (px_lo, fy), (px_hi, fy), (mx, fy),
+            (px_lo, ry), (px_hi, ry), (mx, ry),
+        ]
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
@@ -1363,8 +1464,8 @@ class Stand:
         ) * Box(self.bx, self.y1 - self.y0, base_t)
         base = fillet(base.edges().filter_by(Axis.Z), base_r)
         base = fillet(base.edges().group_by(Axis.Z)[-1], base_top_fillet)
-        # no pad pockets — the underside stays flat (pockets kept failing in
-        # print); the TPU pads glue straight onto it at assembly
+        if self.pad_pockets:
+            base -= pad_pockets(self.pad_positions())
         base += joint_keys(self.band_mid)
         base -= joint_screw_bores(self.joint_screw_xs)
         base -= joint_screw_head_pockets(self.joint_screw_xs)
@@ -1598,17 +1699,29 @@ class Stand:
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
+        # Handedness: the unmirrored body is currently the RIGHT-hand part
+        # (picked at random, no special reason); 'left' mirrors it. The base
+        # needs NO
+        # mirror: keys, screw bores and the boot flat are all symmetric
+        # about the band mid, so the mirrored upright re-seats on the same
+        # slab shifted 2*band_mid — one printed slab serves both hands.
         if part == 'base':
             return self.base_solid()
         if part == 'fit':
             body = self.plate_and_posts()
-            return mirror(body, about=Plane.YZ) if side == 'right' else body
+            return mirror(body, about=Plane.YZ) if side == 'left' else body
         if part == 'upright':
             body = self.upright_solid()
-            return mirror(body, about=Plane.YZ) if side == 'right' else body
-        # 'full': fused assembly preview of the two parts
-        body = self.base_solid() + self.upright_solid()
-        return mirror(body, about=Plane.YZ) if side == 'right' else body
+            return mirror(body, about=Plane.YZ) if side == 'left' else body
+        # 'full': fused assembly preview. For 'left', mount the mirrored
+        # upright on the SAME slab the way it is actually assembled:
+        # shifted 2*band_mid so grooves/screw pockets land on keys/bores.
+        upright = self.upright_solid()
+        if side == 'left':
+            upright = Pos(2 * self.band_mid, 0, 0) * mirror(
+                upright, about=Plane.YZ
+            )
+        return self.base_solid() + upright
 
 
 def summary(name: str, part) -> None:
@@ -1653,12 +1766,19 @@ def main() -> None:
     ap.add_argument('--side', choices=['left', 'right'], default='left')
     ap.add_argument(
         '--part',
-        choices=['base', 'upright', 'full', 'fit', 'joint'],
+        choices=['base', 'upright', 'full', 'fit', 'joint', 'padtest'],
         default='full',
         help="'base' = base slab (follows the band footprint) | "
         "'upright' = per-tilt part | "
         "'full' = fused preview | 'fit' = flat validation plate | "
-        "'joint' = fit-test coupons",
+        "'joint' = fit-test coupons | "
+        "'padtest' = slicer-support coupons (pad pocket, head pocket)",
+    )
+    ap.add_argument(
+        '--pad-pockets',
+        action='store_true',
+        help='cut the 6 pad pockets into the base underside '
+        '(slicer-support experiment; default off = plain flat underside)',
     )
     ap.add_argument(
         '--tilt',
@@ -1734,6 +1854,18 @@ def main() -> None:
             export_step(part, step)
             print(f'          {step}')
 
+    if args.part == 'padtest':
+        # production-geometry support coupons, no Stand layout needed
+        emit(pad_coupon(), 'pad_coupon')
+        emit(head_coupon(), 'head_coupon')
+        return
+
+    # Set-angles go into the per-layout stems (upright/full/fit): the post
+    # pattern (band, ribs, keys) moves with them. The base slab and the
+    # joint coupons keep one stable filename, regenerated from the
+    # current layout on demand.
+    angle_tag = ','.join(f'{a:g}' for a in set_angles)
+
     if args.part == 'joint':
         # the coupons reuse the exact production features, so they need the
         # derived layout (band mid / screw positions) from a real Stand
@@ -1743,12 +1875,23 @@ def main() -> None:
         emit(joint_coupon_boot(stand), 'joint_coupon_boot')
         return
 
-    # The base is tilt- and side-independent: one Stand, one export.
+    # The base is tilt- and side-INDEPENDENT: keys, screw bores and the
+    # boot flat are symmetric about the band mid, so one slab serves both
+    # hands (the mirrored upright re-seats shifted 2*band_mid).
     if args.part == 'base':
         stands = [
-            Stand(pcb_w, pcb_h, holes, outline, args.post_h, args.attach, set_angles)
+            Stand(
+                pcb_w,
+                pcb_h,
+                holes,
+                outline,
+                args.post_h,
+                args.attach,
+                set_angles,
+                pad_pockets=args.pad_pockets,
+            )
         ]
-        stems = ['stand_base']
+        stems = ['stand_base' + ('_pads' if args.pad_pockets else '')]
     else:
         # 'fit' geometry does not vary with the tilt; only build it once.
         if args.part == 'fit':
@@ -1766,17 +1909,20 @@ def main() -> None:
                     set_angles,
                     tilt,
                     flange_w=args.flange,
+                    pad_pockets=args.pad_pockets,
                 )
             )
-            tag = f'_t{tilt:g}'
+            tag = f'_t{tilt:g}_a{angle_tag}'
             if args.flange:
                 tag += f'_flange{args.flange:g}'
+            if args.pad_pockets:
+                tag += '_pads'
             if args.part == 'upright':
                 stems.append(f'stand_{args.side}_upright{tag}')
             elif args.part == 'full':
                 stems.append(f'stand_{args.side}_full{tag}')
             else:
-                stems.append(f'stand_{args.side}_fit')
+                stems.append(f'stand_{args.side}_fit_a{angle_tag}')
 
     for stand, stem in zip(stands, stems, strict=True):
         for (ang, pts), (_, _, _, corner_z) in zip(
@@ -1785,7 +1931,8 @@ def main() -> None:
             print(
                 f'set {ang:5.1f}°: posts x=[{min(x for x, _ in pts):7.2f}, '
                 f'{max(x for x, _ in pts):7.2f}]  '
-                f'lowest PCB outline point z={corner_z:6.2f} mm'
+                f'lowest PCB outline point z={corner_z:6.2f} mm '
+                f'(slide margin {(corner_z - stand.origin_z) / stand.ct:.2f} mm)'
             )
         key_xs = [round(stand.band_mid + s * key_x, 1) for s in (-1, 1)]
         print(

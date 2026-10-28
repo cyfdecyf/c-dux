@@ -282,6 +282,36 @@ def main() -> None:
     print(f'   gap to base top {corn_w[2] - stand.base_t:.2f} mm; '
           f'x within boot span: {s.boot_lo <= corn_w[0] <= s.boot_hi}')
 
+    # ---- H3 self-tap screw capacity (informational only) --------------------
+    # The 3 nut-clamped screws hold the board in practice; this hole is
+    # rarely used, so the report just states what length fits — no gating.
+    print('\n== 4. H3 self-tap pilot: usable screw length (informational)')
+    hx, hy = s.lowest_post
+    free = face_z + args.pcb_t            # bore through PCB+post+plate
+    x0, x1 = (s.band_mid - stand.key_x - stand.key_l / 2 - stand.joint_clear,
+              s.band_mid + stand.key_x + stand.key_l / 2 + stand.joint_clear)
+    in_groove_x = x0 <= hx <= x1
+    # the boot/haunch plastic behind the back face ends at the key-groove
+    # front wall (world y = key_y0 - joint_clear) when the post sits over
+    # the groove x-span; otherwise the boot prism bounds it instead
+    y_wall = (stand.key_y0 - stand.joint_clear if in_groove_x
+              else s.boot_rear)
+    toe = (y_wall - st * hy) / ct
+    seat = (ct * hy) / st                # axis crosses the seat plane z=6
+    toe = min(toe, seat)
+    print(f'   free bore Ø{stand.tap_d:g} (PCB {args.pcb_t:g} + post '
+          f'{s.post_h:g} + plate {stand.plate_t:g}) = {free:.1f} mm')
+    print(f'   toe plastic behind back face (ends at '
+          f"{'groove front wall' if in_groove_x else 'boot rear'} y={y_wall:g})"
+          f' = {toe:.1f} mm')
+    print(f'   max M4 length under head  ~ {free + toe:.1f} mm  '
+          '(tip must stay in plastic; beyond it enters the key groove and '
+          'hits the base key)')
+    for screw_len in (12, 14, 16):
+        bite = screw_len - free   # tip depth into the toe plastic
+        print(f'   M4x{screw_len}: tip bites {bite:.1f} mm into the toe '
+              'plastic')
+
     if args.json:
         fig = {
             'tilt': s.tilt, 'set_angle': ang_, 'shift': s_shift, 'lift': lift,
