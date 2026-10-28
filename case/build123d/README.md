@@ -132,8 +132,9 @@ uv run stand.py --set-angles -53           # 安装组平面内旋转角(默认 
 
 输出到 `out/`:`stand_base.*`(底座,按当前布局导出;开 `--pad-pockets`
 时为 `stand_base_pads.*`)、
-`stand_<side>_upright_t<角度>.*`(立板)、`stand_<side>_full_t<角度>.*`
-(装配预览)、`joint_coupon_base.*` / `joint_coupon_boot.*`(配合
+`stand_<side>_upright_t<后仰角>_a<安装角>.*`(立板)、
+`stand_<side>_full_t<后仰角>_a<安装角>.*`(装配预览)、
+`joint_coupon_base.*` / `joint_coupon_boot.*`(配合
 试块,两个独立文件,各自平放即打印姿态)。默认只导出 STL(切片用),加
 `--step` 同时导出 STEP——代打服务的首选格式(精确 B-rep,非网格近似)。
 终端打印包围盒、体积与估重(实心体积;FDM 有填充时实际更轻)。默认行为 =
@@ -145,7 +146,7 @@ uv run stand.py --set-angles -53           # 安装组平面内旋转角(默认 
 | `--part` | `full` | `base` 底座 / `upright` 立板 / `full` 装配预览 / `joint` 配合试块 / `padtest` 支撑试块 / `fit` 平板验证件 |
 | `--tilt` | `30` | 立板/装配预览的后仰角(度),逗号分隔可批量出图 |
 | `--side` | `left` | 左/右半(底座足迹随布局非对称,当前按左布局导出) |
-| `--set-angles` | `-53` | 安装组的平面内旋转角(度) |
+| `--set-angles` | `-53` | 安装组的平面内旋转角(度);布局随之变,已编码进立板/装配预览文件名(`a<角度>` 段) |
 | `--post-h` | 3 | 柱高 = PCB 与背板间隙 |
 | `--attach` | `nut` | `nut` 背面螺母沉孔 / `tap` 自攻(仅 PCB 柱位) |
 | `--flange` | `0` | 靴座四周可掰法兰,值 = 外伸宽度(mm);底板黏性不足的保险,打印后掰掉 |

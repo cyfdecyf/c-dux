@@ -20,9 +20,10 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 - 输出按 `--part` 分:base(共享底座)/ upright(按角度立板)/
   full(装配预览)/ fit(平板验证件)/ joint(配合试块)/
   padtest(切片支撑试块,胶垫孔 + 沉头孔生产几何);
-- 文件名:`stand_<side>_upright_t<tilt>[_flange<W>][_pads].stl`。
-  注意 **stem 只编码 tilt 不编码 set-angles**——同一 t30 文件名可能对应
-  不同柱位旋转,混用多组 `--set-angles` 时要另行区分(已知限制)。
+- 文件名:`stand_<side>_upright_t<tilt>_a<set-angles>[_flange<W>][_pads].stl`
+  (fit 无 t 段;base 与 joint 试块不编码安装角;多个安装角用逗号连接)。
+  **set-angles 编码在立板/装配预览文件名里**——同一 t30 下不同柱位旋转
+  不会再撞名。
 
 ## 2. 三个坐标系(接手第一件事)
 
@@ -502,7 +503,8 @@ uv run --with numpy python overhang_report.py out/stand_left_upright_t30.stl
 
 ## 10. 已知限制与扩展点
 
-- stem 不编码 set-angles(§1);多角度组合并存时需自行区分;
+- base 与 joint 试块的文件名不编码安装角:换角度重出时同名覆盖;底带
+  随角度微移(1–2 mm 级),混用多组角度的底座/试块需自行区分;
 - 柱位外摆时肋会被放弃(设计如此,脚本打 note/warning);接合螺丝由靴座
   缘派生,不再有“靴座盖不住螺丝位”的退出,只剩靴座宽不足以容纳两颗
   对角螺丝时的 assert(--set-angles 太散);

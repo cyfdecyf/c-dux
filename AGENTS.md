@@ -54,11 +54,11 @@ uv run stand.py --part base --step && uv run stand.py --part upright --step && u
 uv run keyboard_clearance_check.py --json out/keyboard_clearance.json
                                                   # ③ 键盘 vs 底座/靴座干涉+间隙（须全 0）
 uv run --with trimesh --with shapely --with numpy --with networkx --with rtree \
-  python layer_float_audit.py out/stand_left_upright_t30.stl
-uv run --with numpy python overhang_report.py out/stand_left_upright_t30.stl
+  python layer_float_audit.py out/stand_left_upright_t30_a-53.stl
+uv run --with numpy python overhang_report.py out/stand_left_upright_t30_a-53.stl
                                                   # ④ 打印性审计（悬空/孤岛、下行面），基线见 docs/stand-design.md §9
 uv run --with matplotlib --with trimesh --with shapely python \
-  pcb_rotation_figure.py --data out/keyboard_clearance.json --stand-stl out/stand_left_full_t30.stl
+  pcb_rotation_figure.py --data out/keyboard_clearance.json --stand-stl out/stand_left_full_t30_a-53.stl
                                                   # ⑤ PCB 旋转前后对比图（含水平面/键位/角点朝向）
 # PCB 改版后：
 uv run check_pcb_alignment.py                     # gerber 钻孔 ↔ KiCad 封装 ↔ stand 孔位表三方核对

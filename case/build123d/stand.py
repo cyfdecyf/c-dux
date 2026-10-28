@@ -1841,6 +1841,12 @@ def main() -> None:
         emit(head_coupon(), 'head_coupon')
         return
 
+    # Set-angles go into the per-layout stems (upright/full/fit): the post
+    # pattern (band, ribs, keys) moves with them. The base slab and the
+    # joint coupons keep one stable filename, regenerated from the
+    # current layout on demand.
+    angle_tag = ','.join(f'{a:g}' for a in set_angles)
+
     if args.part == 'joint':
         # the coupons reuse the exact production features, so they need the
         # derived layout (band mid / screw positions) from a real Stand
@@ -1885,7 +1891,7 @@ def main() -> None:
                     pad_pockets=args.pad_pockets,
                 )
             )
-            tag = f'_t{tilt:g}'
+            tag = f'_t{tilt:g}_a{angle_tag}'
             if args.flange:
                 tag += f'_flange{args.flange:g}'
             if args.pad_pockets:
@@ -1895,7 +1901,7 @@ def main() -> None:
             elif args.part == 'full':
                 stems.append(f'stand_{args.side}_full{tag}')
             else:
-                stems.append(f'stand_{args.side}_fit')
+                stems.append(f'stand_{args.side}_fit_a{angle_tag}')
 
     for stand, stem in zip(stands, stems, strict=True):
         for (ang, pts), (_, _, _, corner_z) in zip(
