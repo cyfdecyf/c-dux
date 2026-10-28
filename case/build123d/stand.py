@@ -63,7 +63,7 @@ keyboard_drop down the plate (user-measured).
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
     uv run stand.py --part base              # shared base slab (print once)
-    uv run stand.py --part base --pad-pockets  # ... with 4 corner pad pockets
+    uv run stand.py --part base --pad-pockets  # ... with 6 pad pockets
     uv run stand.py --part upright           # left upright, 30 deg recline
     uv run stand.py --side right --part upright
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
@@ -208,7 +208,7 @@ rib_foot = rib_t + 12  # wedge root depth along the seat (was rib_t + 8 =
 #            from vertical, self-supporting
 rib_top_flat = 2.5  # rib apex truncated to this width: the zero-thickness
 #            tip printed fragile and carries no load up there anyway
-# Pad pockets are back at the corners, as a slicer-support experiment: the
+# Pad pockets are back, as a slicer-support experiment: the
 # Ø20 two-level no-support pockets kept failing in print (recess-ceiling
 # droop / strands fouling the glue face), so the retry is a plain
 # straight-wall Ø20.2 × 0.6 pocket with NO steps — the recess ceiling rides
@@ -704,7 +704,7 @@ class Stand:
         self.face_z = plate_t + post_h  # PCB seating plane over the back face
         self.attach = attach
         self.flange_w = flange_w
-        self.pad_pockets = pad_pockets  # cut the 4 corner pad pockets
+        self.pad_pockets = pad_pockets  # cut the 6 pad pockets
         # (off by default: plain flat underside)
 
         self.origin_z = base_t  # the plate rests on the seat plane; the boot
@@ -1090,15 +1090,21 @@ class Stand:
     # -- keyboard-plate frame helpers -----------------------------------------
 
     def pad_positions(self) -> list[tuple[float, float]]:
-        """Four corners, one pad each (the old 6-pad layout's mid rows are
-        gone). Per-side x: the slab IS the raw (asymmetric) post-need
-        footprint, so each pad hugs ITS slab edge — unaffected by the band
-        clamp (the base does not change when the plate band is trimmed)."""
+        """Six pads: the 4 corners plus one mid front/rear each (the old
+        6-pad layout). Per-side x: the slab IS the raw (asymmetric)
+        post-need footprint, so the outer pads hug THEIR slab edge —
+        unaffected by the band clamp (the base does not change when the
+        plate band is trimmed); the mid pads sit on the slab mid (= the
+        band mid, the base is asymmetric)."""
         px_lo = self.slab_lo + base_r + pad_edge
         px_hi = self.slab_hi - base_r - pad_edge
+        mx = (self.slab_lo + self.slab_hi) / 2
         fy = self.y0 + base_r + pad_edge
         ry = self.y1 - base_r - pad_edge
-        return [(px_lo, fy), (px_hi, fy), (px_lo, ry), (px_hi, ry)]
+        return [
+            (px_lo, fy), (px_hi, fy), (mx, fy),
+            (px_lo, ry), (px_hi, ry), (mx, ry),
+        ]
 
     # -- backplate + posts, plate-local frame (x right, y up, z out front) ----
 
@@ -1752,7 +1758,7 @@ def main() -> None:
     ap.add_argument(
         '--pad-pockets',
         action='store_true',
-        help='cut the 4 corner pad pockets into the base underside '
+        help='cut the 6 pad pockets into the base underside '
         '(slicer-support experiment; default off = plain flat underside)',
     )
     ap.add_argument(
