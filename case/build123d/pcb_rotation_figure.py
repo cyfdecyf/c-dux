@@ -17,7 +17,7 @@ Usage:
     uv run --with matplotlib --with trimesh --with shapely python \
         pcb_rotation_figure.py \
         --data out/keyboard_clearance.json \
-        --stand-stl out/stand_left_full_t30_a-53.stl
+        --stand-stl out/stand_right_full_t30_a-53.stl
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
                     help='JSON from keyboard_clearance_check.py --json')
     ap.add_argument('--stand-stl', default=None,
                     help='fused assembly STL (stand.py --part full); '
-                    'default out/stand_left_full_t<tilt>_a<angle>.stl')
+                    'default out/stand_right_full_t<tilt>_a<angle>.stl')
     ap.add_argument('--out', default='out/pcb_rotation_compare.png')
     ap.add_argument('--highlight-key', default='ring_TOP',
                     help='switch name (key of the JSON "keys" map) to mark')
@@ -80,7 +80,7 @@ def main() -> None:
     r = math.radians(ang)
     stl = (
         args.stand_stl
-        or f'out/stand_left_full_t{figd["tilt"]:g}_a{figd["set_angle"]:g}.stl'
+        or f'out/stand_right_full_t{figd["tilt"]:g}_a{figd["set_angle"]:g}.stl'
     )
 
     def to_plate_uv(u: float, v: float) -> tuple[float, float]:

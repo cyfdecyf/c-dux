@@ -24,6 +24,9 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
   (fit 无 t 段;base 与 joint 试块不编码安装角;多个安装角用逗号连接)。
   **set-angles 编码在立板/装配预览文件名里**——同一 t30 下不同柱位旋转
   不会再撞名。
+  注意 未镜像的建模体当前是右手件(随机选的,并无偏好):`--side left` 镜像
+  立板/fit;full 预览中镜像立板沿 x 平移 2×band_mid 后与底座求并
+  (复现真实装配)。
 
 ## 2. 三个坐标系(接手第一件事)
 
@@ -60,7 +63,9 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
    校验:flange ∈ [0, 30],tilt/set-angles 非空;
 2. `parse_pcb(args.pcb)` → `(pcb_w, pcb_h, holes, outline)`;
 3. 每个 tilt 构造一个 `Stand`(base 只构造一次,与 tilt 无关);
-4. `stand.build(part, side)`:right 侧 = `mirror(body, Plane.YZ)`;
+4. `stand.build(part, side)`:未镜像体 = 右手件;left 侧 =
+   `mirror(body, Plane.YZ)`(立板/fit;base 不镜像);full 预览中镜像
+   立板沿 x 平移 2×band_mid 后与底座布尔并(复现真实装配);
 5. `emit()`:导 STL,`--step` 加导 STEP,`--show` 只推送 OCP CAD
    Viewer(不导文件)。
 
@@ -94,7 +99,7 @@ pcb/v2.0/c-dux.kicad_pcb ──parse_pcb──┐
 | `upright_solid` | 立板(世界系) | 见 §6.3 |
 | `_wedge` | YZ 楔形(托肩/肋共用，肋顶可截平) | 锚定背板背面、法向嵌入 1.5 mm 全长贴合(不随靴座前缘浮动,见 §6.3);斜边朝上前 → 免支撑 |
 | `_breakaway_flange` | `--flange` 可掰法兰 | 厚 0.6(2 层),绕靴座足迹(含前伸段)外伸 W |
-| `build` | 按 part 分发;right = YZ 镜像 | |
+| `build` | 按 part 分发;left = 立板/fit YZ 镜像(未镜像体 = 右手);base 不镜像,full 中镜像立板平移 2×band_mid | |
 
 ### `main` / 工具
 
@@ -495,8 +500,8 @@ M4×12 tip 咬合 1.4 mm。
 
 ```sh
 uv run --with trimesh --with shapely --with numpy --with networkx \
-  --with rtree python layer_float_audit.py out/stand_left_upright_t30.stl
-uv run --with numpy python overhang_report.py out/stand_left_upright_t30.stl
+  --with rtree python layer_float_audit.py out/stand_right_upright_t30_a-53.stl
+uv run --with numpy python overhang_report.py out/stand_right_upright_t30_a-53.stl
 ```
 
 完整实物验证清单见 README"首版验证清单"。
@@ -508,8 +513,8 @@ uv run --with numpy python overhang_report.py out/stand_left_upright_t30.stl
 - 柱位外摆时肋会被放弃(设计如此,脚本打 note/warning);接合螺丝由靴座
   缘派生,不再有“靴座盖不住螺丝位”的退出,只剩靴座宽不足以容纳两颗
   对角螺丝时的 assert(--set-angles 太散);
-- 底座足迹非对称(跟随底带):`--part base` 按当前左布局坐标导出,
-  右手布局需另行镜像(尚未参数化);
+- 底座足迹非对称(跟随底带):`--part base` 按当前右布局坐标导出,
+  左手布局需另行镜像(尚未参数化);
 - 有效倾角范围 10–40°(受接合螺钉 y=14.5 落在靴座台上约束);
 - 腹板减重孔已整体移除(历史见提交 b187149;站立姿态下孔顶是 ~Ø52 桥,
   牺牲的省料由收腰承担);

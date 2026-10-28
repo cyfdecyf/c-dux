@@ -32,7 +32,7 @@ def load_stl(path: Path) -> np.ndarray:
 def main() -> None:
     path = Path(
         sys.argv[1] if len(sys.argv) > 1
-        else 'out/stand_left_upright_t30_a-53.stl'
+        else 'out/stand_right_upright_t30_a-53.stl'
     )
     tris = load_stl(path)
     n = len(tris)

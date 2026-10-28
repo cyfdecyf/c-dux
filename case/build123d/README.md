@@ -119,8 +119,8 @@ uv sync          # 创建 .venv,按 uv.lock 安装(build123d 0.11.1)
 ```sh
 uv run stand.py --part base                # 底座(足迹跟随底带,随布局导出)
 uv run stand.py --part base --pad-pockets  # 底座加 4 角胶垫凹槽(默认不开)
-uv run stand.py --part upright             # 左立板,30° 后仰
-uv run stand.py --side right --part upright
+uv run stand.py --side right --part upright  # 右立板(未镜像体)
+uv run stand.py --part upright             # 左立板(= 右立板镜像),30° 后仰
 uv run stand.py --part upright --tilt 10,15,20,25,30   # 一批角度的立板
 uv run stand.py --part upright --flange 8   # 立板加可掰法兰(黏板保险)
 uv run stand.py --part full                # 装配预览(两件布尔并,左半)
@@ -145,7 +145,7 @@ uv run stand.py --set-angles -53           # 安装组平面内旋转角(默认 
 |---|---|---|
 | `--part` | `full` | `base` 底座 / `upright` 立板 / `full` 装配预览 / `joint` 配合试块 / `padtest` 支撑试块 / `fit` 平板验证件 |
 | `--tilt` | `30` | 立板/装配预览的后仰角(度),逗号分隔可批量出图 |
-| `--side` | `left` | 左/右半(底座足迹随布局非对称,当前按左布局导出) |
+| `--side` | `left` | 左/右半(未镜像体为右手);底座不区分左右 |
 | `--set-angles` | `-53` | 安装组的平面内旋转角(度);布局随之变,已编码进立板/装配预览文件名(`a<角度>` 段) |
 | `--post-h` | 3 | 柱高 = PCB 与背板间隙 |
 | `--attach` | `nut` | `nut` 背面螺母沉孔 / `tap` 自攻(仅 PCB 柱位) |
@@ -190,7 +190,7 @@ uv run stand.py --set-angles -53           # 安装组平面内旋转角(默认 
 
 - 接合面是水平座面(z = 6 mm),所有连接特征都用世界坐标定义、与倾角
   无关——柱位布局不变时同一底座配任意角度的立板;底座足迹跟随底带、
-  非对称(按当前左布局导出,右手布局需另行镜像);
+  非对称(按当前右布局导出,左手布局需另行镜像);
 - **连接 = 2 榫键 + 2×M4**:底座顶面两根 30 × 8 × 8 mm 榫键(以底带
   中线居中 band_mid ± 12,合并为一根 54 mm 键条,剪切路径居中;
   顶缘 0.5 mm 倒角,键顶与靴座顶齐平)抗剪、定位;立板靴座底开

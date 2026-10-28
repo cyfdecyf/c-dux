@@ -52,6 +52,13 @@ flipped vs the KiCad view per the mounting orientation above:
     u = Y_max - Y_kicad          (horizontal)
     v = X_kicad - X_min          (height, from the stalk-key edge)
 
+Handedness: the unmirrored layout happens to be the RIGHT-hand upright,
+picked at random, no deeper reason. --side left mirrors the upright; the
+BASE is hand-universal: every engagement feature (key bar, joint screws,
+boot flat) is symmetric about the band mid, so the mirrored upright
+re-seats on the very same slab shifted 2*band_mid sideways (the 'full'
+preview shows exactly that mounting).
+
 Rotation set — one 4-hole pattern per upright, rotated in-plane about its
 centroid by --set-angles (default -53 deg CCW in the front view; negate to
 mirror the tilt direction). The solver centers the set laterally and lifts
@@ -62,10 +69,10 @@ keyboard_drop down the plate (user-measured).
 
 Usage:
     uv sync                                  # once; creates .venv + uv.lock
-    uv run stand.py --part base              # shared base slab (print once)
+    uv run stand.py --part base              # base slab, serves BOTH hands
     uv run stand.py --part base --pad-pockets  # ... with 6 pad pockets
-    uv run stand.py --part upright           # left upright, 30 deg recline
-    uv run stand.py --side right --part upright
+    uv run stand.py --side right --part upright  # right upright (unmirrored)
+    uv run stand.py --part upright           # left upright = mirrored right
     uv run stand.py --part upright --tilt 10,15,20,25,30   # a batch of angles
     uv run stand.py --part full              # fused assembly preview
     uv run stand.py --part joint             # small fit-test coupons
@@ -1692,17 +1699,29 @@ class Stand:
     # -- top level ------------------------------------------------------------
 
     def build(self, part: str, side: str):
+        # Handedness: the unmirrored body is currently the RIGHT-hand part
+        # (picked at random, no special reason); 'left' mirrors it. The base
+        # needs NO
+        # mirror: keys, screw bores and the boot flat are all symmetric
+        # about the band mid, so the mirrored upright re-seats on the same
+        # slab shifted 2*band_mid — one printed slab serves both hands.
         if part == 'base':
             return self.base_solid()
         if part == 'fit':
             body = self.plate_and_posts()
-            return mirror(body, about=Plane.YZ) if side == 'right' else body
+            return mirror(body, about=Plane.YZ) if side == 'left' else body
         if part == 'upright':
             body = self.upright_solid()
-            return mirror(body, about=Plane.YZ) if side == 'right' else body
-        # 'full': fused assembly preview of the two parts
-        body = self.base_solid() + self.upright_solid()
-        return mirror(body, about=Plane.YZ) if side == 'right' else body
+            return mirror(body, about=Plane.YZ) if side == 'left' else body
+        # 'full': fused assembly preview. For 'left', mount the mirrored
+        # upright on the SAME slab the way it is actually assembled:
+        # shifted 2*band_mid so grooves/screw pockets land on keys/bores.
+        upright = self.upright_solid()
+        if side == 'left':
+            upright = Pos(2 * self.band_mid, 0, 0) * mirror(
+                upright, about=Plane.YZ
+            )
+        return self.base_solid() + upright
 
 
 def summary(name: str, part) -> None:
@@ -1856,7 +1875,9 @@ def main() -> None:
         emit(joint_coupon_boot(stand), 'joint_coupon_boot')
         return
 
-    # The base is tilt- and side-independent: one Stand, one export.
+    # The base is tilt- and side-INDEPENDENT: keys, screw bores and the
+    # boot flat are symmetric about the band mid, so one slab serves both
+    # hands (the mirrored upright re-seats shifted 2*band_mid).
     if args.part == 'base':
         stands = [
             Stand(
