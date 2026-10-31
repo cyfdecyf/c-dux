@@ -16,7 +16,9 @@ C. Dux front               |  C. Dux back
 - **Rotary encoder** placed near thumb, easy to reach
 - **Diodless Reversible PCB**: Single PCB design that can be used for both left and right halves
 
-Note: I did not consider designing a case as I use the keyboard with naked PCB.
+Note: I did not consider designing a case when I designed the PCB, as I use the
+keyboard with naked PCB. A 3D printed vertical stand came later, see
+[3D printed case](#3d-printed-case) below.
 So it's better to use leadless PCB and solder. I find SAC305 solder (with 380-degree solder iron)
 is a little harder to use compared to Tin-Lead 63/37 solder (with 280-degree solder iron),
 but not too much.
@@ -98,6 +100,19 @@ a lot to relieve my RSI and I can work all day long without much pain in my fore
 ![C. Dux v2 in use](./images/c-dux-v2-in-use.jpg)
 
 ![C. Dux v2 with M4 threaded bolts](./images/c-dux-v2-m4-bolts.jpg)
+
+### 3D printed case
+
+The keyboard stands vertically on the desk with a 3D printed case, designed with
+[build123d](https://github.com/gumyr/build123d). It is a two-piece design: a
+shared base (symmetric, printed once) plus an upright that sets the recline
+angle. The two parts join with tongue-and-groove keys and 2×M4 screws from the
+bottom, so trying a different recline angle only requires reprinting the
+upright.
+
+- Usage, parameters and printing guide:
+  [case/build123d/README.md](./case/build123d/README.md)
+- Code-level design doc: [docs/stand-design.md](./docs/stand-design.md)
 
 ### C. Dux v1
 
