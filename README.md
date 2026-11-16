@@ -110,6 +110,8 @@ angle. The two parts join with tongue-and-groove keys and 2×M4 screws from the
 bottom, so trying a different recline angle only requires reprinting the
 upright.
 
+- Ready-to-print STLs (base + left/right uprights, tilt 30°):
+  [case/stl/stand_v1](./case/stl/stand_v1)
 - Usage, parameters and printing guide:
   [case/build123d/README.md](./case/build123d/README.md)
 - Code-level design doc: [docs/stand-design.md](./docs/stand-design.md)

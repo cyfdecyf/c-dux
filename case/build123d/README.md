@@ -139,6 +139,10 @@ uv run stand.py --set-angles -53           # 安装组平面内旋转角(默认 
 `--step` 同时导出 STEP——代打服务的首选格式(精确 B-rep,非网格近似)。
 终端打印包围盒、体积与估重(实心体积;FDM 有填充时实际更轻)。默认行为 =
 **只导出文件**;想实时预览加 `--show`(推送 OCP CAD Viewer、不导出文件)。
+
+当前 v1 零件的成品 STL 已存档在 [`case/stl/stand_v1`](../stl/stand_v1):
+`stand_base.stl` + `stand_left/right_upright_t30_a-53.stl`(默认参数
+出图,可直接切片打印;改了几何或角度请重新生成并同步更新该目录)。
 查看器没开或半开只打印一行提示,文件产出不依赖查看器。
 
 | 参数 | 默认 | 说明 |
