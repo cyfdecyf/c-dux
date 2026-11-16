@@ -116,6 +116,8 @@ upright.
   [case/build123d/README.md](./case/build123d/README.md)
 - Code-level design doc: [docs/stand-design.md](./docs/stand-design.md)
 
+![C. Dux v2 stand case](./images/c-dux-v2-stand-case.jpeg)
+
 ### C. Dux v1
 
 This is my first attempt to build a keyboard. The rotary encoder is difficult to reach
